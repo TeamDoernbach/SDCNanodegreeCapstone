@@ -84,4 +84,4 @@ class Controller(object):
             brake = abs(decel)*self.vehicle_mass*self.wheel_radius    # Torque Nm
 
 
-        return throttle, brake, steering 
+        return throttle, brake, steering

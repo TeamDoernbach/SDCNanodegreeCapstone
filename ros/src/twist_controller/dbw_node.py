@@ -53,15 +53,16 @@ class DBWNode(object):
         # Create `Controller` object
         # TODO: Clean up, since all inputs from Q&A video were blindly added for initial version,
         #       where actually precisely zero inputs would be necessary.
-        self.controller = Controller(   vehicle_mass = vehicle_mass,
-                                        brake_deadband = brake_deadband,
-                                        decel_limit = decel_limit,
-                                        accel_limit = accel_limit,
-                                        wheel_radius = wheel_radius,
-                                        wheel_base = wheel_base,
-                                        steer_ratio = steer_ratio,
-                                        max_lat_accel = max_lat_accel,
-                                        max_steer_angle = max_steer_angle)
+        self.controller = Controller(vehicle_mass = vehicle_mass,
+                                    fuel_capacity = fuel_capacity,
+                                    brake_deadband = brake_deadband,
+                                    decel_limit = decel_limit,
+                                    accel_limit = accel_limit,
+                                    wheel_radius = wheel_radius,
+                                    wheel_base = wheel_base,
+                                    steer_ratio = steer_ratio,
+                                    max_lat_accel = max_lat_accel,
+                                    max_steer_angle = max_steer_angle)
 
         # Subscribe to all the topics you need to
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)    # source: simulator
