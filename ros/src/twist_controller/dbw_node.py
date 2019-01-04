@@ -58,6 +58,15 @@ class DBWNode(object):
 
         # TODO: Subscribe to all the topics you need to
 
+        # Initialize necessary variables
+        self.current_vel = None
+        self.curr_ang_vel = None
+        self.dbw_enabled = None
+        self.linear_vel = None
+        self.angular_vel = None
+        # Initialize vehicle actuator commands to zero
+        self.throttle = self.steering = self.brake = 0
+
         self.loop()
 
     def loop(self):
