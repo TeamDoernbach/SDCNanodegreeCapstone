@@ -46,16 +46,13 @@ class DBWNode(object):
         max_lat_accel = rospy.get_param('~max_lat_accel', 3.)
         max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
 
-        self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
-                                         SteeringCmd, queue_size=1)
-        self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd',
-                                            ThrottleCmd, queue_size=1)
-        self.brake_pub = rospy.Publisher('/vehicle/brake_cmd',
-                                         BrakeCmd, queue_size=1)
+        self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',    SteeringCmd, queue_size=1)
+        self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size=1)
+        self.brake_pub = rospy.Publisher('/vehicle/brake_cmd',       BrakeCmd,    queue_size=1)
 
-        # TODO: Create `Controller` object
-        # self.controller = Controller(<Arguments you wish to provide>)
-        # Added all inputs from Q&A video, although for initial version none are used
+        # Create `Controller` object
+        # TODO: Clean up, since all inputs from Q&A video were blindly added for initial version,
+        #       where actually precisely zero inputs would be necessary.
         self.controller = Controller(   vehicle_mass = vehicle_mass,
                                         brake_deadband = brake_deadband,
                                         decel_limit = decel_limit,
@@ -66,11 +63,10 @@ class DBWNode(object):
                                         max_lat_accel = max_lat_accel,
                                         max_steer_angle = max_steer_angle)
 
-        # TODO: Subscribe to all the topics you need to
+        # Subscribe to all the topics you need to
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)    # source: simulator
         rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb)  # source: simulator
-        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb)            # source: wp follower
-
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb)            # source: WP follower
         # Initialize necessary variables
         self.current_vel = None
         self.curr_ang_vel = None
@@ -79,7 +75,7 @@ class DBWNode(object):
         self.angular_vel = None
         # Initialize vehicle actuator commands to zero
         self.throttle = self.steering = self.brake = 0
-
+        # Start loop function
         self.loop()
 
     def loop(self):
@@ -87,11 +83,10 @@ class DBWNode(object):
         while not rospy.is_shutdown():
             # Get predicted throttle, brake, and steering using `twist_controller`
             if not None in (self.current_vel, self.linear_vel, self.angular_vel):
-                self.throttle, self.brake, self.steering = self.controller.control( \
-                                                                self.current_vel,
-                                                                self.dbw_enabled,
-                                                                self.linear_vel,
-                                                                self.angular_vel)
+                self.throttle, self.brake, self.steering = self.controller.control(self.current_vel,
+                                                                                   self.dbw_enabled,
+                                                                                   self.linear_vel,
+                                                                                   self.angular_vel)
             # Publish commands only, if DBW is enable (i.e. if not in manual mode)
             if self.dbw_enabled:
                 self.publish(self.throttle, self.brake, self.steering)
