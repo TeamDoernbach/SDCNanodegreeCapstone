@@ -67,9 +67,9 @@ class DBWNode(object):
                                         max_steer_angle = max_steer_angle)
 
         # TODO: Subscribe to all the topics you need to
-        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
-        rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb)
-        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb)
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)    # source: simulator
+        rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb)  # source: simulator
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb)            # source: wp follower
 
         # Initialize necessary variables
         self.current_vel = None
@@ -98,6 +98,22 @@ class DBWNode(object):
             # Sleep until next cycle
             rate.sleep()
 
+    def dbw_enabled_cb(self, msg):
+        # Is DBW enabled: Directly use boolean message from ROS topic "/vehicle/dbw_enabled"
+        # Signal source: "simulator node"
+        self.dbw_enabled = msg
+
+    def velocity_cb(self, msg):
+        # Current longitudinal velocity: Extract from ROS topic "/current_velocity"
+        # Signal source: "simulator node"
+        self.current_vel = msg.twist.linear.x
+
+    def twist_cb(self, msg):
+        # Current longitudinal and angular velocity: Extract from "/twist_cmd"
+        # Signal source: "waypoint follower node"
+        self.linear_vel = msg.twist.linear.x
+        self.angular_vel = msg.twist.angular.z
+
     def publish(self, throttle, brake, steer):
         tcmd = ThrottleCmd()
         tcmd.enable = True
@@ -115,17 +131,6 @@ class DBWNode(object):
         bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
-
-    def dbw_enabled_cb(self, ASDF):
-        null
-
-    def velocity_cb(self, ASDF):
-        null
-
-    def twist_cb(self, ASDF):
-        null
-
-
 
 if __name__ == '__main__':
     DBWNode()
