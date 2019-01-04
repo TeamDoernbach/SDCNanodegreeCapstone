@@ -55,8 +55,21 @@ class DBWNode(object):
 
         # TODO: Create `Controller` object
         # self.controller = Controller(<Arguments you wish to provide>)
+        # Added all inputs from Q&A video, although for initial version none are used
+        self.controller = Controller(   vehicle_mass = vehicle_mass,
+                                        brake_deadband = brake_deadband,
+                                        decel_limit = decel_limit,
+                                        accel_limit = accel_limit,
+                                        wheel_radius = wheel_radius,
+                                        wheel_base = wheel_base,
+                                        steer_ratio = steer_ratio,
+                                        max_lat_accel = max_lat_accel,
+                                        max_steer_angle = max_steer_angle)
 
         # TODO: Subscribe to all the topics you need to
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb)
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb)
 
         # Initialize necessary variables
         self.current_vel = None
@@ -102,6 +115,16 @@ class DBWNode(object):
         bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
+
+    def dbw_enabled_cb(self, ASDF):
+        null
+
+    def velocity_cb(self, ASDF):
+        null
+
+    def twist_cb(self, ASDF):
+        null
+
 
 
 if __name__ == '__main__':
