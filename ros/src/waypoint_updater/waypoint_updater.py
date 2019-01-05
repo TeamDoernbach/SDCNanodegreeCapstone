@@ -24,7 +24,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-
+LOOP_HEARTZ = 50
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -46,12 +46,16 @@ class WaypointUpdater(object):
         self.waypoint_tree = None
 
         self.loop()
-        # rospy.spin()
 
     def loop(self):
-        rate = rospy.Rate(50) #50 Hz
+        """
+        Initialize the waypoint updater. Only run while the DWB system is enabled 
+        (automate throttle, brake, steering control system)
 
-        # Only iterate while the dbw system is enabled (automate throttle, brake, steering control system)
+        The frequency of this publishing loop is controlled by LOOP_HEARTZ
+        """
+        rate = rospy.Rate(LOOP_HEARTZ)
+
         while not rospy.is_shutdown():
             if self.pose and self.base_waypoints:
                 # Get closest waypoint
@@ -65,8 +69,14 @@ class WaypointUpdater(object):
             rate.sleep()
 
     def get_closest_waypoint_idx(self):
+        """
+        Find the closest waypoint index.
+        """
+        # To understand this nested object, check `rosmsg info styx_msgs/Lane`
         x = self.pose.pose.position.x
         y = self.pose.pose.position.y
+
+        # Limit to only return 1 record, `[0]` is the position and `[1]` is the index
         closest_idx = self.waypoint_tree.query([x, y], 1)[1]
 
         # Check if closest is ahead or behind vehicle
@@ -86,6 +96,9 @@ class WaypointUpdater(object):
         return closest_idx
 
     def publish_waypoints(self, closest_idx, farthest_idx):
+        """
+        Creating new lane object for the car
+        """
         lane = Lane()
         lane.header = self.base_waypoints.header
         lane.waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
@@ -93,10 +106,16 @@ class WaypointUpdater(object):
         self.final_waypoints_pub.publish(lane)
 
     def pose_cb(self, msg):
+        """
+        Retrieve the current location of car
+        """
         # TODO: Implement
         self.pose = msg
 
     def waypoints_cb(self, waypoints):
+        """
+        Get the waypoint values from /base_waypoints
+        """
         # TODO: Implement
         self.base_waypoints = waypoints
         if not self.waypoints_2d:
