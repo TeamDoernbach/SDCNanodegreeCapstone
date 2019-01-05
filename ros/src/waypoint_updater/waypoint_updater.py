@@ -23,7 +23,7 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 40 # Number of waypoints we will publish. You can change this number
 LOOP_HERTZ = 50
 
 class WaypointUpdater(object):
@@ -49,7 +49,7 @@ class WaypointUpdater(object):
 
     def loop(self):
         """
-        Initialize the waypoint updater. Only run while the DWB system is enabled 
+        Initialize the waypoint updater. Only run while the DWB system is enabled
         (automate throttle, brake, steering control system)
 
         The frequency of this publishing loop is controlled by LOOP_HERTZ
@@ -92,7 +92,7 @@ class WaypointUpdater(object):
 
         if val > 0:
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
-        
+
         return closest_idx
 
     def publish_waypoints(self, closest_idx, farthest_idx):
@@ -102,7 +102,7 @@ class WaypointUpdater(object):
         lane = Lane()
         lane.header = self.base_waypoints.header
         lane.waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
-        
+
         self.final_waypoints_pub.publish(lane)
 
     def pose_cb(self, msg):
