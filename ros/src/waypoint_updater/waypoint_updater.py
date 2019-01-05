@@ -24,7 +24,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-LOOP_HEARTZ = 50
+LOOP_HERTZ = 50
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -52,9 +52,9 @@ class WaypointUpdater(object):
         Initialize the waypoint updater. Only run while the DWB system is enabled 
         (automate throttle, brake, steering control system)
 
-        The frequency of this publishing loop is controlled by LOOP_HEARTZ
+        The frequency of this publishing loop is controlled by LOOP_HERTZ
         """
-        rate = rospy.Rate(LOOP_HEARTZ)
+        rate = rospy.Rate(LOOP_HERTZ)
 
         while not rospy.is_shutdown():
             if self.pose and self.base_waypoints:
