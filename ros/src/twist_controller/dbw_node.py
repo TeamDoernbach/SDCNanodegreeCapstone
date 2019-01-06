@@ -138,6 +138,9 @@ class DBWNode(object):
         self.angular_vel = msg.twist.angular.z
 
     def publish(self, throttle, brake, steer):
+        """
+        Publish the throttle, brake, and steer command to the car while the DBW system is enabled
+        """
         tcmd = ThrottleCmd()
         tcmd.enable = True
         tcmd.pedal_cmd_type = ThrottleCmd.CMD_PERCENT
