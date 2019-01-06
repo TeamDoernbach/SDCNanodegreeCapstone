@@ -13,7 +13,7 @@ class Controller(object):
         # TODO: Implement
 
         # Yaw controller
-        min_speed = 0.1   # TODO: is moving this variable outside of class useful?
+        min_speed = 0.1
         self.yaw_controller = YawController(wheel_base,
                                             steer_ratio,
                                             min_speed,
@@ -31,6 +31,8 @@ class Controller(object):
         # Define low-pass filter settings
         tau = 0.5  # 1/(2pi*tau) = cutoff frequency
         ts = 0.02  # Sample time
+
+        # Filtering out all high frequency noise in the velocity
         self.vel_lpf = LowPassFilter(tau,ts)
 
         # Initialization of vehicle properties
@@ -63,7 +65,9 @@ class Controller(object):
         #rospy.logwarn("Current velocity:   {0}".format(current_vel))
         #rospy.logwarn("Filtered velocity:  {0}".format(self.vel_lpf.get()))
 
-        steering = self.yaw_controller.get_steering(linear_vel, angular_vel, current_vel)
+        steering = self.yaw_controller.get_steering(linear_vel, 
+                                                    angular_vel, 
+                                                    current_vel)
 
         vel_error = linear_vel - current_vel
         self.last_vel = current_vel
