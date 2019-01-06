@@ -25,7 +25,7 @@ class Controller(object):
         ki = 0.1  # Integral term
         kd = 0.0  # Differential term
         mn = 0.0  # Min throttle value
-        mx = 0.2  # Max throttle value
+        mx = 0.5  # Max throttle value
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
 
         # Define low-pass filter settings
@@ -77,6 +77,7 @@ class Controller(object):
         self.last_time = current_time
 
         throttle = self.throttle_controller.step(vel_error, sample_time)
+        
         brake = 0.
 
         if ((linear_vel < 0.01) and (current_vel < 0.1)):    # Changed linear_vel == 0. to < 0.01
