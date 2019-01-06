@@ -61,9 +61,8 @@ class WaypointUpdater(object):
                 # Get closest waypoint
                 closest_waypoint_idx = self.get_closest_waypoint_idx()
 
-                # Set farthest waypoiny
-                farthest_waypoint_idx = \
-                    (closest_waypoint_idx + LOOKAHEAD_WPS) %len(self.waypoints_2d)
+                # Set farthest waypoint. No wrap-around necessary here! This is done in next func
+                farthest_waypoint_idx = closest_waypoint_idx + LOOKAHEAD_WPS
                 # Publish waypoint
                 self.publish_waypoints(closest_waypoint_idx, farthest_waypoint_idx)
             rate.sleep()
@@ -82,15 +81,30 @@ class WaypointUpdater(object):
         # Check if closest is ahead or behind vehicle
         closest_coord = self.waypoints_2d[closest_idx]
         if (closest_idx > 0):
-            prev_coord = self.waypoints_2d[closest_idx - 1]
+            # Regular case: somewhere in between the waypoints
+            prev_idx = closest_idx - 1
+            prev_coord = self.waypoints_2d[prev_idx]
+            log_str = 'waypoint_updater.py: regular case, no wrap-around. '
+            log_str += 'prev_wp=' + str(prev_idx) + ', '
+            log_str += 'curr_wp=' + str(closest_idx)
+            rospy.loginfo_throttle(1,log_str) # Print log only per second for a smaller log file
         elif (closest_idx == 0):
-            prev_coord = self.waypoints_2d[len(self.waypoints_2d)]
-            str_a = 'waypoint_updater.py: lower-bound wrap around occured. '
-            str_b = 'prev_wp=' + str(len(self.waypoints_2d)) + ', '
-            str_c = 'curr_wp=' + str(closest_idx)
-            rospy.loginfo(str_a + str_b + str_c)
+            # Wrap-around case: closest waypoint equals zero (begin of list) --> wrap-around
+            prev_idx = len(self.waypoints_2d)-1
+            prev_coord = self.waypoints_2d[prev_idx]
+            log_str = 'waypoint_updater.py: lower-bound wrap around occured. '
+            log_str += 'prev_wp=' + str(prev_idx) + ', '
+            log_str += 'curr_wp=' + str(closest_idx)
+            rospy.loginfo(log_str)
         else:
-            rospy.logerr('waypoint_updater.py: closest_idx < 0, not plausible!')
+            # Warning case: negative number found
+            prev_idx = closest_idx - 1
+            prev_coord = self.waypoints_2d[prev_idx]
+            log_str = 'waypoint_updater.py: WARNING! closest_idx < 0, not plausible! '
+            log_str += 'prev_wp=' + str(prev_idx) + ', '
+            log_str += 'curr_wp=' + str(closest_idx)
+            rospy.loginfo(log_str)
+            #rospy.logwarn(log_str)
 
         # Equation for hyperplane through closest_coords
         cl_vect = np.array(closest_coord)
@@ -110,7 +124,9 @@ class WaypointUpdater(object):
         """
         lane = Lane()
         lane.header = self.base_waypoints.header
-        lane.waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
+        # Wrap around with numpy take
+        indices = range(closest_idx,farthest_idx)
+        lane.waypoints = np.take(self.base_waypoints.waypoints,indices,mode='wrap')
 
         self.final_waypoints_pub.publish(lane)
 
