@@ -62,8 +62,8 @@ class WaypointUpdater(object):
                 closest_waypoint_idx = self.get_closest_waypoint_idx()
 
                 # Set farthest waypoiny
-                farthest_waypoint_idx = closest_waypoint_idx + LOOKAHEAD_WPS
-
+                farthest_waypoint_idx = \
+                    (closest_waypoint_idx + LOOKAHEAD_WPS) %len(self.waypoints_2d)
                 # Publish waypoint
                 self.publish_waypoints(closest_waypoint_idx, farthest_waypoint_idx)
             rate.sleep()
@@ -81,7 +81,16 @@ class WaypointUpdater(object):
 
         # Check if closest is ahead or behind vehicle
         closest_coord = self.waypoints_2d[closest_idx]
-        prev_coord = self.waypoints_2d[closest_idx - 1]
+        if (closest_idx > 0):
+            prev_coord = self.waypoints_2d[closest_idx - 1]
+        elif (closest_idx == 0):
+            prev_coord = self.waypoints_2d[len(self.waypoints_2d)]
+            str_a = 'waypoint_updater.py: lower-bound wrap around occured. '
+            str_b = 'prev_wp=' + str(len(self.waypoints_2d)) + ', '
+            str_c = 'curr_wp=' + str(closest_idx)
+            rospy.loginfo(str_a + str_b + str_c)
+        else:
+            rospy.logerr('waypoint_updater.py: closest_idx < 0, not plausible!')
 
         # Equation for hyperplane through closest_coords
         cl_vect = np.array(closest_coord)
