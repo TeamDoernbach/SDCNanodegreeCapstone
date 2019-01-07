@@ -80,24 +80,25 @@ class WaypointUpdater(object):
 
         # Check if closest is ahead or behind vehicle
         closest_coord = self.waypoints_2d[closest_idx]
+        # Regular case: somewhere in between the waypoints
         if (closest_idx > 0):
-            # Regular case: somewhere in between the waypoints
             prev_idx = closest_idx - 1
             prev_coord = self.waypoints_2d[prev_idx]
             log_str = 'waypoint_updater.py: regular case, no wrap-around. '
             log_str += 'prev_wp=' + str(prev_idx) + ', '
             log_str += 'curr_wp=' + str(closest_idx)
-            rospy.loginfo_throttle(1,log_str) # Print log only per second for a smaller log file
+            rospy.loginfo(log_str)
+            #rospy.loginfo_throttle(1,log_str) # Print log only each second for a smaller log file
+        # Wrap-around case: closest waypoint equals zero (begin of list) --> wrap-around
         elif (closest_idx == 0):
-            # Wrap-around case: closest waypoint equals zero (begin of list) --> wrap-around
-            prev_idx = len(self.waypoints_2d)-1
+            prev_idx = len(self.waypoints_2d)-1                # choose last index of list
             prev_coord = self.waypoints_2d[prev_idx]
             log_str = 'waypoint_updater.py: lower-bound wrap around occured. '
             log_str += 'prev_wp=' + str(prev_idx) + ', '
             log_str += 'curr_wp=' + str(closest_idx)
             rospy.loginfo(log_str)
+        # Warning case: negative number found
         else:
-            # Warning case: negative number found
             prev_idx = closest_idx - 1
             prev_coord = self.waypoints_2d[prev_idx]
             log_str = 'waypoint_updater.py: WARNING! closest_idx < 0, not plausible! '

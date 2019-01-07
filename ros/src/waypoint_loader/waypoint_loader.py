@@ -54,7 +54,11 @@ class WaypointLoader(object):
                 p.twist.twist.linear.x = float(self.velocity)
 
                 waypoints.append(p)
-        return self.decelerate(waypoints)
+        # In starter code, decelaration was issued for last points to make car stop.
+        #return self.decelerate(waypoints)
+        
+        # For wrap-around / endless driving mode, this step is not used anymore.
+        return waypoints
 
     def distance(self, p1, p2):
         x, y, z = p1.x - p2.x, p1.y - p2.y, p1.z - p2.z
