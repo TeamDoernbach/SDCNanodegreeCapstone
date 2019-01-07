@@ -18,6 +18,9 @@
     <!--Traffic Light Detector Node -->
     <include file="$(find tl_detector)/launch/tl_detector.launch"/>
 
+    <!--Doernbach Debug View Node -->
+    <include file="$(find doernbach_debug_view)/launch/doernbach_debug_view.launch"/>
+
     <!--Traffic Light Locations and Camera Config -->
     <param name="traffic_light_config" textfile="$(find tl_detector)/sim_traffic_light_config.yaml" />
 </launch>
