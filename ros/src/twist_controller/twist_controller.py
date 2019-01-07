@@ -5,83 +5,72 @@ import rospy
 
 GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
-
+DRIVER_WEIGHT = 85
+# NOTE:not realistic yet, It was from my PID PRoject
+KD_accel = 0.012
+KI_accel = 0.083
+KP_accel = 0.9
+KD_yaw = 1
+KI_yaw = 1
+KP_yaw = 1
 
 class Controller(object):
-    def __init__(self, vehicle_mass, fuel_capacity, brake_deadband, decel_limit, accel_limit,
-                 wheel_radius, wheel_base, steer_ratio, max_lat_accel, max_steer_angle):
-        # TODO: Implement
-
-        # Yaw controller
-        min_speed = 0.1   # TODO: is moving this variable outside of class useful?
-        self.yaw_controller = YawController(wheel_base,
-                                            steer_ratio,
-                                            min_speed,
-                                            max_lat_accel,
-                                            max_steer_angle)
-
-        # Speed throttle controller
-        kp = 0.3  # Proportional term
-        ki = 0.1  # Integral term
-        kd = 0.0  # Differential term
-        mn = 0.0  # Min throttle value
-        mx = 0.2  # Max throttle value
-        self.throttle_controller = PID(kp, ki, kd, mn, mx)
-
-        # Define low-pass filter settings
-        tau = 0.5  # 1/(2pi*tau) = cutoff frequency
-        ts = 0.02  # Sample time
-        self.vel_lpf = LowPassFilter(tau,ts)
-
-        # Initialization of vehicle properties
-        self.vehicle_mass = vehicle_mass
-        self.fuel_capacity = fuel_capacity
-        self.brake_deadband = brake_deadband
-        self.decel_limit = decel_limit
-        self.accel_limit = accel_limit
-        self.wheel_radius = wheel_radius
-
-        # Get current time stamp during initialization
+    # better to use *args and** kwargs
+    def __init__(self, *args, **kwargs):
         self.last_time = rospy.get_time()
+        self.yaw_control = yaw_controller.YawController(kwargs['wheel_base'], kwargs['steer_ratio'], ONE_MPH, kwargs['max_lat_accel'], kwargs['max_steer_angle'])
 
+        self.brake_deadband = kwargs['brake_deadband']
+        self.fuel_capacity = kwargs['fuel_capacity']
+        self.vehicle_mass = kwargs['vehicle_mass']
+        self.decel_limit = kwargs['decel_limit']
+        self.accel_limit = kwargs['accel_limit']
+        self.wheel_radius = kwargs['wheel_radius']
 
-    def control(self, current_vel, dbw_enabled, linear_vel, angular_vel):
-        # TODO: Change the arg, kwarg list to suit your needs
-        # Return throttle, brake, steer
+        # Throttle PID and filter
+        self.throttle_PID = pid.PID(KP_accel, KI_accel, KD_accel, 0, 1)
+        # NOTE: Values could be unrealistic
+        self.throttle_lpf = LowPassFilter(0.02, 0.03)
+        # Steering filter,# NOTE: Values could be unrealistic
+        self.steer_lpf = LowPassFilter(0.015, 0.01)
+        
 
-        # During manual operation, reset throttle controller to avoid false growth of integral term
-        # Return zero for all controller inputs
+    def control(self, desired_velocity_x, desired_vel_angular_z, current_velocity_x, dbw_enabled):
+
+        actual_time = rospy.get_time()
+        throttle = 0
+        brake = 0
+        steer = self.yaw_control.get_steering( desired_velocity_x, desired_vel_angular_z, current_velocity_x)
+        # Feed steering filter
+        steer = self.steer_lpf.filt(steer)
+
         if not dbw_enabled:
-            self.throttle_controller.reset()
+            # Reset Throttle PID if dbw is not enable
+            self.throttle_PID.reset()
+            #Update timestamp
+            self.last_time = actual_time
             return 0., 0., 0.
 
-        current_vel = self.vel_lpf.filt(current_vel)
+        # Calculate error
+        diff_velocity = desired_velocity_x - current_velocity_x
+        diff_time = actual_time - self.last_time
+        self.last_time = actual_time
 
-        #rospy.logwarn("Angular velocity:   {0}".format(angular_vel))
-        #rospy.logwarn("Target velocity:    {0}".format(linear_vel))
-        #rospy.logwarn("Target angular vel: {0}\n".format(angular_vel))
-        #rospy.logwarn("Current velocity:   {0}".format(current_vel))
-        #rospy.logwarn("Filtered velocity:  {0}".format(self.vel_lpf.get()))
+        #Limit the new acceleration value accordingly, from Walkthrough
+        new_accel = min(max(self.decel_limit, diff_velocity), self.accel_limit)
+        # Feed throttle filter
+        self.throttle_lpf.filt(new_accel)
+        throttle = self.throttle_PID.step(self.throttle_lpf.get(), diff_time)
 
-        steering = self.yaw_controller.get_steering(linear_vel, angular_vel, current_vel)
+        # If the difference is positive, then we accelerate
+        if throttle > 0:
+            brake = 0
+        # If the difference is negative, then we decelerate
+        else:
+            throttle = 0
+            # Torque  = F * radius -> F = mass * acceleration. Include mass of fuel. Suggested in Project Walkthrough 
+            brake = abs(new_accel * (self.vehicle_mass + self.fuel_capacity * GAS_DENSITY + DRIVER_WEIGHT) * self.wheel_radius)
 
-        vel_error = linear_vel - current_vel
-        self.last_vel = current_vel
-
-        current_time = rospy.get_time()
-        sample_time = current_time - self.last_time
-        self.last_time = current_time
-
-        throttle = self.throttle_controller.step(vel_error, sample_time)
-        brake = 0.
-
-        if ((linear_vel < 0.01) and (current_vel < 0.1)):    # Changed linear_vel == 0. to < 0.01
-            throttle = 0.
-            brake = 700  # Nm
-        elif ((throttle < 0.1) and (vel_error < 0.0)):
-            throttle = 0.
-            decel = max(vel_error, self.decel_limit)
-            brake = abs(decel)*self.vehicle_mass*self.wheel_radius    # Torque Nm
-
-
-        return throttle, brake, steering
+        rospy.loginfo("DesVelLin: "+str(desired_velocity_x)+" DesVelAng: "+str(desired_vel_angular_z)+" CurVel: "+str(current_velocity_x)+ " new_acc: "+str(new_accel))        
+        rospy.loginfo("Steering: "+str(steer)+" Throttle: "+str(throttle)+" Brake: "+str(brake))
+        return throttle, brake, steer
