@@ -112,6 +112,7 @@ class DBWNode(object):
             # Publish commands only, if DBW is enable (i.e. if not in manual mode)
             if self.dbw_enabled:
                 self.publish(self.throttle, self.brake, self.steering)
+
             # Sleep until next cycle
             rate.sleep()
 

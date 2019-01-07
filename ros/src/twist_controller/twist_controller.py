@@ -12,6 +12,15 @@ class Controller(object):
                  wheel_radius, wheel_base, steer_ratio, max_lat_accel, max_steer_angle):
         # TODO: Implement
 
+        # Initialization of vehicle properties
+        self.vehicle_mass = vehicle_mass
+        self.fuel_capacity = fuel_capacity
+        self.brake_deadband = brake_deadband
+        self.decel_limit = decel_limit
+        self.accel_limit = accel_limit
+        self.wheel_radius = wheel_radius
+        self.max_steer_angle = max_steer_angle
+
         # Yaw controller
         min_speed = 0.1
         self.yaw_controller = YawController(wheel_base,
@@ -21,11 +30,11 @@ class Controller(object):
                                             max_steer_angle)
 
         # Speed throttle controller
-        kp = 0.3  # Proportional term
+        kp = 0.8  # Proportional term
         ki = 0.1  # Integral term
-        kd = 0.0  # Differential term
+        kd = 0.1  # Differential term
         mn = 0.0  # Min throttle value
-        mx = 0.5  # Max throttle value
+        mx = 0.8  # Max throttle value
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
 
         # Define low-pass filter settings
@@ -34,14 +43,6 @@ class Controller(object):
 
         # Filtering out all high frequency noise in the velocity
         self.vel_lpf = LowPassFilter(tau,ts)
-
-        # Initialization of vehicle properties
-        self.vehicle_mass = vehicle_mass
-        self.fuel_capacity = fuel_capacity
-        self.brake_deadband = brake_deadband
-        self.decel_limit = decel_limit
-        self.accel_limit = accel_limit
-        self.wheel_radius = wheel_radius
 
         # Get current time stamp during initialization
         self.last_time = rospy.get_time()
@@ -88,5 +89,28 @@ class Controller(object):
             decel = max(vel_error, self.decel_limit)
             brake = abs(decel)*self.vehicle_mass*self.wheel_radius    # Torque Nm
 
+        steering = self.stabilize_steering(steering, vel_error)
+        
+        #rospy.logwarn("Throttle:   {0}".format(throttle))
+        #rospy.logwarn("Brake:    {0}".format(brake))
+        #rospy.logwarn("Steering:    {0}".format(steering))
+        #rospy.logwarn("Velocity error: {0}".format(vel_error))
 
         return throttle, brake, steering
+
+    def stabilize_steering(self, steering, vel_error):
+        """
+        Stabilize the steering angle
+        """
+        if vel_error <= abs(0.001):
+            if steering > 0:
+                return steering - abs(vel_error)
+            else:
+                return steering + abs(vel_error)
+        elif vel_error >= abs(1.0) and steering == 0.0:
+            return steering
+        else:
+            if steering > 0:
+                return steering + abs(vel_error)
+            else:
+                return steering - abs(vel_error)
