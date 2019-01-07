@@ -6,3 +6,4 @@ devel
 profile.tmp
 
 *.bag
+./bagfiles
