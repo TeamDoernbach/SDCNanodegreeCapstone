@@ -1,4 +1,3 @@
-import rospy
 
 MIN_NUM = float('-inf')
 MAX_NUM = float('inf')
@@ -12,17 +11,20 @@ class PID(object):
         self.min = mn
         self.max = mx
 
-        self.int_val = self.last_error = 0.
+        self.int_val = self.last_int_val = self.last_error = 0.
 
     def reset(self):
         self.int_val = 0.0
+        self.last_int_val = 0.0
 
     def step(self, error, sample_time):
+        self.last_int_val = self.int_val
 
         integral = self.int_val + error * sample_time;
         derivative = (error - self.last_error) / sample_time;
 
-        val = self.kp * error + self.ki * integral + self.kd * derivative;
+        y = self.kp * error + self.ki * self.int_val + self.kd * derivative;
+        val = max(self.min, min(y, self.max))
 
         if val > self.max:
             val = self.max
@@ -32,7 +34,19 @@ class PID(object):
             self.int_val = integral
         self.last_error = error
 
-        #rospy.logwarn("Throttle: {0}"".format(val))
-        #rospy.logwarn("Velocity error: {0}"".format(error))
-
         return val
+
+    def update_gains(self, p, i, d):
+        update = False
+        if self.kp != p:
+            self.kp = p
+            update=True
+        if self.ki != i:
+            self.ki = i
+            update=True
+        if self.kd != d:
+            self.kd = d
+            update=True
+
+        if update:
+            self.reset()
