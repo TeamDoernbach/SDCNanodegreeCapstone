@@ -44,7 +44,7 @@ class Bridge(object):
         self.yaw = None
         self.angular_vel = 0.
         self.bridge = CvBridge()
-        self.cam_nth_img_use = 5   # Every n-th image: definition of N
+        self.cam_nth_img_use = 10   # Every n-th image: definition of N
         self.cam_nth_img_ctr = 1    # Every n-th image: initialization of counter variable
 
         self.callbacks = {
