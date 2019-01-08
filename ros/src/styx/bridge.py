@@ -44,7 +44,7 @@ class Bridge(object):
         self.yaw = None
         self.angular_vel = 0.
         self.bridge = CvBridge()
-        self.cam_nth_img_use = 10   # Every n-th image: definition of N
+        self.cam_nth_img_use = 5   # Every n-th image: definition of N
         self.cam_nth_img_ctr = 1    # Every n-th image: initialization of counter variable
 
         self.callbacks = {
@@ -178,14 +178,14 @@ class Bridge(object):
 
     def publish_camera(self, data):
         # Only process every nth image (simulator performance issues)
-        if (self.cam_nth_img_ctr != self.cam_nth_img_use):
+        if (self.cam_nth_img_ctr != 0):
             # Raise counter by 1
-            self.cam_nth_img_ctr += 1 % self.cam_nth_img_ctr
+            self.cam_nth_img_ctr = (self.cam_nth_img_ctr + 1) % self.cam_nth_img_ctr
             # Exit function
             return
         else:
             # Raise counter by 1
-            self.cam_nth_img_ctr += 1 % self.cam_nth_img_ctr
+            self.cam_nth_img_ctr = (self.cam_nth_img_ctr + 1) % self.cam_nth_img_ctr
             # Prepare image
             imgString = data["image"]
             image = PIL_Image.open(BytesIO(base64.b64decode(imgString)))
