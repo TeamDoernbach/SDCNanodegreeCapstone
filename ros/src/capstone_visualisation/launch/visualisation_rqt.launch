@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="capstone_visualisation" type="visualise.py" name="visualise" />
+
+    <!-- Load RQT with a pre-setup perspective-->
+    <node name="capstone_rqt" pkg="rqt_gui" type="rqt_gui" respawn="false"
+	output="screen" args="--perspective-file $(find visualisation)/launch/rqt.perspective"/>
+</launch>

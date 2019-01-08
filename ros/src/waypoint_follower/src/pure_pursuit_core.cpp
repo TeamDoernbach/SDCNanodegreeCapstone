@@ -100,6 +100,37 @@ double PurePursuit::calcCurvature(geometry_msgs::Point target) const
   ROS_INFO_STREAM("kappa :" << kappa);
   return kappa;
 }
+double PurePursuit::AccCalc() const
+{
+	double twistvelcur = current_velocity_.twist.linear.x;
+	double lookaheadSec = 2.0;
+	double lookaheadMet = 2.0; // 2m
+	double lookahead= twistvelcur * lookaheadSec;
+	if (lookahead < lookaheadMet){
+		lookahead = lookaheadMet; // für niedrige Geschwindigkeiten
+	}
+	int cwp = getClosestWaypoint(current_waypoints_.getCurrentWaypoints(),current_pose_.pose);
+	double planedist = 0.0;
+	double velfinal = 0.0;
+	while(cwp< current_waypoints_.getSize())
+	{
+		planedist = getPlaneDistance(current_waypoints_.getWaypointPosition(cwp),current_pose_.pose.position);
+		velfinal = getCmdVelocity(cwp);
+		if(planedist>lookahead){
+			break;		
+		}
+		if(planedist>0.1 && velfinal<0.01){
+			break;		
+		}
+		cwp++;
+	}
+	if (planedist<0.01) {planedist = 0.01;}
+	double velfinalmanip = pow(velfinal,2);
+	double twistvelmanip = pow(twistvelcur,2);
+	double a = (velfinalmanip - twistvelmanip) / (2* planedist);
+	if (a<-10.0) {a = -10;} // tricky
+	return a;
+}
 
 // linear interpolation of next target
 bool PurePursuit::interpolateNextTarget(int next_waypoint, geometry_msgs::Point *next_target) const
@@ -391,7 +422,7 @@ geometry_msgs::TwistStamped PurePursuit::go()
 
   // ROS_INFO("next_target : ( %lf , %lf , %lf)", next_target.x, next_target.y,next_target.z);
 
-  return outputTwist(calcTwist(calcCurvature(position_of_next_target_), getCmdVelocity(0)));
+  return outputTwist(calcTwist(calcCurvature(position_of_next_target_), AccCalc()));
 
 // ROS_INFO("linear : %lf, angular : %lf",twist.twist.linear.x,twist.twist.angular.z);
 
