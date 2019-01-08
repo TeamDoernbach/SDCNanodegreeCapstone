@@ -4,5 +4,5 @@
 
     <!-- Load RQT with a pre-setup perspective-->
     <node name="capstone_rqt" pkg="rqt_gui" type="rqt_gui" respawn="false"
-	output="screen" args="--perspective-file $(find visualisation)/launch/rqt.perspective"/>
+	output="screen" args="--perspective-file $(find capstone_visualisation)/launch/rqt.perspective"/>
 </launch>
