@@ -31,20 +31,20 @@ class TwistController(object):
                                 decel_limit,
                                 accel_limit)
 
-    def control(self, goal_acceleration, goal_angular_velocity, current_velocity, deltat, dbw_enabled):
+    def control(self, desired_acceleration, desired_angular_velocity, current_velocity, deltat, dbw_enabled):
         current_speed = sqrt(current_velocity[0]**2 + current_velocity[1]**2)
         #goal_speed = sqrt(goal_velocity[0]**2 + goal_velocity[1]**2)
         #speed_diff = goal_speed - current_speed
-        acceleration = self.throttle_pid.step(goal_acceleration, deltat)
+        acceleration = self.throttle_pid.step(desired_acceleration, deltat)
         
-        angular_velocity = self.steer_pid.step(goal_angular_velocity, deltat)
+        angular_velocity = self.steer_pid.step(desired_angular_velocity, deltat)
         
         if not dbw_enabled:
             self.throttle_pid.reset()
             self.steer_pid.reset()
         
         #rospy.logwarn("twist_controller | speed_diff: %s   acceleration: %s   goal_angular: %s   angular: %s",
-        #      speed_diff, acceleration, goal_angular_velocity, angular_velocity)
+        #      speed_diff, acceleration, desired_angular_velocity, angular_velocity)
 
         return acceleration, angular_velocity
 

@@ -200,9 +200,9 @@ include_directories(
 # endif()
 
 ## Add folders to be run by python nosetests
-catkin_add_nosetests(test/test_stability_controller.py)
+#catkin_add_nosetests(test/test_stability_controller.py)
 
-if(CATKIN_ENABLE_TESTING)
-  find_package(rostest REQUIRED)
-  add_rostest(test/dbw_sim.test)
-endif()
+#if(CATKIN_ENABLE_TESTING)
+#  find_package(rostest REQUIRED)
+#  add_rostest(test/dbw_sim.test)
+#endif()

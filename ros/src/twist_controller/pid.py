@@ -35,7 +35,7 @@ class PID(object):
         self.last_error = error
 
         return val
-
+# Partially dynamic.
     def update_gains(self, p, i, d):
         update = False
         if self.kp != p:

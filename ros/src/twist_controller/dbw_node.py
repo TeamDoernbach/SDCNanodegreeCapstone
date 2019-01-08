@@ -6,7 +6,7 @@ from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 from geometry_msgs.msg import TwistStamped
 import math
 
-from stability_controller import TwistController
+from main_controller import TwistController
 from gain_controller import GainController
 
 
@@ -65,8 +65,8 @@ class DBWNode(object):
         self.gain_controller = GainController(max_throttle=1.0, max_brake=1.0, max_steer_angle=max_steer_angle,
                                               delay_seconds=1.0, steer_ratio=steer_ratio)
 
-        self.goal_acceleration = 0
-        self.goal_yaw_rate = 0.
+        self.desired_acceleration = 0
+        self.desired_yaw_rate = 0.
         self.current_linear = [0,0]
 
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_callback)
@@ -85,13 +85,13 @@ class DBWNode(object):
         return config
 
     def twist_cmd_callback(self, msg):
-        new_goal_acceleration = msg.twist.linear.x
-        if new_goal_acceleration < 0 and self.goal_acceleration > 0:
+        new_desired_acceleration = msg.twist.linear.x
+        if new_desired_acceleration < 0 and self.desired_acceleration > 0:
             self.twist_controller.reset_throttle_pid()
-        #rospy.logwarn("Updating intended acceleration: %s", new_goal_acceleration)
+        #rospy.logwarn("Updating intended acceleration: %s", new_desired_acceleration)
 
-        self.goal_acceleration = new_goal_acceleration
-        self.goal_yaw_rate = msg.twist.angular.z
+        self.desired_acceleration = new_desired_acceleration
+        self.desired_yaw_rate = msg.twist.angular.z
 
     def current_velocity_callback(self, msg):
         self.current_linear = [msg.twist.linear.x, msg.twist.linear.y]
@@ -109,19 +109,16 @@ class DBWNode(object):
             angular_acceleration = 0.0
             deltat = 0.02
 
-            goal_linear_acceleration, goal_angular_velocity = self.twist_controller.control(self.goal_acceleration,
-                                                                                            self.goal_yaw_rate,
+            desired_linear_acceleration, desired_angular_velocity = self.twist_controller.control(self.desired_acceleration,
+                                                                                            self.desired_yaw_rate,
                                                                                             self.current_linear,
                                                                                             deltat,
                                                                                             self.dbw_enabled)
 
             # rospy.logwarn("c:%.2f, g:%.2f, o:%.2f", self.current_linear[0],
-            #               self.goal_linear[0], goal_linear_acceleration)
+            #               self.goal_linear[0], desired_linear_acceleration)
 
-            #if(self.goal_linear[0] != 0 and goal_linear_acceleration < 0 and goal_linear_acceleration > -self.brake_deadband):
-            #    goal_linear_acceleration = 0
-
-            throttle, brake, steering = self.gain_controller.control(goal_linear_acceleration, goal_angular_velocity,
+            throttle, brake, steering = self.gain_controller.control(desired_linear_acceleration, desired_angular_velocity,
                                                                      linear_speed, angular_velocity,
                                                                      linear_acceleration, angular_acceleration,
                                                                      deltat, self.dbw_enabled)

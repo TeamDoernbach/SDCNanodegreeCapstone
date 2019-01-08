@@ -8,12 +8,12 @@ class GainController(object):
         self.max_steer_angle = max_steer_angle
         self.delay_seconds = delay_seconds
         self.steer_ratio = steer_ratio
-    def control(self, goal_acceleration, goal_angular_velocity,
+    def control(self, desired_acceleration, desired_angular_velocity,
                       linear_speed, angular_velocity,
                       linear_acceleration, angular_acceleration,
                       deltat, dbw_enabled):
-        throttle = goal_acceleration
-        steer_angle = goal_angular_velocity * self.steer_ratio
+        throttle = desired_acceleration
+        steer_angle = desired_angular_velocity * self.steer_ratio
         brake = 0
         if throttle < 0.:
             brake = 0. - throttle
