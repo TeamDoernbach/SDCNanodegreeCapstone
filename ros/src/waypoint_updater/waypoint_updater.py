@@ -31,6 +31,7 @@ class WaypointUpdater(object):
         rospy.init_node('waypoint_updater')
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
+        rospy.Subscriber('/current_velocty', TwistStamped, self.velocity_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
@@ -39,8 +40,12 @@ class WaypointUpdater(object):
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
+        # Get vehicle parameters from rospy server. Fallback to -5m/s^2, in case value is missing
+        decel_limit = rospy.get_param('~decel_limit',-5)
+
         # TODO: Add other member variables you need below
         self.pose = None
+        self.velocity = None
         self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoint_tree = None
@@ -52,7 +57,7 @@ class WaypointUpdater(object):
         """
         Initialize the waypoint updater. Only run while the DWB system is enabled
         (automate throttle, brake, steering control system)
-        
+
         The frequency of this publishing loop is controlled by LOOP_HERTZ
         """
         rate = rospy.Rate(LOOP_HERTZ)
@@ -131,7 +136,20 @@ class WaypointUpdater(object):
         else:
             indices = range(closest_idx,farthest_idx)
             lane.waypoints = np.take(self.base_waypoints.waypoints,indices,mode='wrap')
+        # In case traffic light signal >= 0, calculate waypoint index, where slow down must start
+        if (self.traffic_light_WP > -1):
+            """
+            ego_curr_WP
+            TrafficLight_WP
+            ego_speed
+            StartBraking_WP (with 0.8x decel_limit to have some buffer)
+            """
+        # Check if ego vehicle is already in area where braking should occur
+        """
+        if ego_curr_WP > StartBraking_WP:
+            linearly interpolate speed until stop point
 
+        """
         self.final_waypoints_pub.publish(lane)
 
     def pose_cb(self, msg):
@@ -140,6 +158,12 @@ class WaypointUpdater(object):
         """
         # TODO: Implement
         self.pose = msg
+
+    def velocity_cb(self, msg):
+        """
+        Retrieve the current vehicle speed
+        """
+        self.velocity = msg.twist.linear.x
 
     def waypoints_cb(self, waypoints):
         """
