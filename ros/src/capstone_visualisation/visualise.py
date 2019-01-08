@@ -10,7 +10,7 @@ from dbw_mkz_msgs.msg import BrakeCmd, ThrottleCmd, SteeringCmd
 
 class VisualizationHelper(object):
     def __init__(self):
-        rospy.init_node("visualise_helper")
+        rospy.init_node("visualise_helper_node")
 
         # rospy.Subscriber("/current_pose", PoseStamped, self.current_pose_callback)
         rospy.Subscriber("/base_waypoints", Lane, self.base_waypoints_callback)
@@ -157,7 +157,4 @@ class VisualizationHelper(object):
 
 
 if __name__ == '__main__':
-    try:
-        VisualizationHelper()
-    except rospy.ROSInterruptException:
-        rospy.logerr('Could not start visualization helper node.')
+	VisualizationHelper()
