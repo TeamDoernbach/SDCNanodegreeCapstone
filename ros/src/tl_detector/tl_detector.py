@@ -23,8 +23,6 @@ class TLDetector(object):
         self.waypoints_2d = None
         self.camera_image = None
         self.lights = []
-        self.camera_nth_img_use = 7   # Every n-th image: definition of N
-        self.camera_nth_img_ctr = 1   # Every n-th image: initialization of counter variable
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -76,14 +74,6 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
-
-        # Only process every nth image (simulator performance issues)
-        if (self.camera_nth_img_ctr != self.camera_nth_img_use):
-            self.camera_nth_img_ctr += 1 % self.camera_nth_img_ctr
-            return
-        else:
-            self.camera_nth_img_ctr += 1 % self.camera_nth_img_ctr
-
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
