@@ -23,6 +23,8 @@ class TLDetector(object):
         self.waypoints_2d = None
         self.camera_image = None
         self.lights = []
+        self.camera_nth_img_use = 7   # Every n-th image: definition of N
+        self.camera_nth_img_ctr = 1   # Every n-th image: initialization of counter variable
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -74,9 +76,18 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
+
+        # Only process every nth image (simulator performance issues)
+        if (self.camera_nth_img_ctr != self.camera_nth_img_use):
+            self.camera_nth_img_ctr += 1 % self.camera_nth_img_ctr
+            return
+        else:
+            self.camera_nth_img_ctr += 1 % self.camera_nth_img_ctr
+
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
+
 
         '''
         Publish upcoming red lights at camera frequency.
@@ -114,8 +125,8 @@ class TLDetector(object):
         # point = [pose.position.x, pose.position.y]
         # print point
         # print x, y
-        
-        return self.waypoint_tree.query([x, y])[1]
+
+        return self.waypoint_tree.query([x, y],1)[1]
 
     def get_light_state(self, light):
         """Determines the current color of the traffic light
@@ -174,7 +185,7 @@ class TLDetector(object):
         if closest_light:
             state = self.get_light_state(light)
             return line_wp_idx, state
-        self.waypoints = None
+        # self.waypoints = None
         return -1, TrafficLight.UNKNOWN
 
 if __name__ == '__main__':
