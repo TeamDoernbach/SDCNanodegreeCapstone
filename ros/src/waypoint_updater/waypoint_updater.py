@@ -24,7 +24,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 40 # Number of waypoints we will publish. You can change this number
-LOOP_HERTZ = 50
+LOOP_HERTZ = 10
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -44,6 +44,7 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoint_tree = None
+        self.traffic_light_WP = None
 
         self.loop()
 
@@ -51,7 +52,7 @@ class WaypointUpdater(object):
         """
         Initialize the waypoint updater. Only run while the DWB system is enabled
         (automate throttle, brake, steering control system)
-
+        
         The frequency of this publishing loop is controlled by LOOP_HERTZ
         """
         rate = rospy.Rate(LOOP_HERTZ)
@@ -124,7 +125,7 @@ class WaypointUpdater(object):
         """
         lane = Lane()
         lane.header = self.base_waypoints.header
-        # Wrap around with numpy take. But only where necessary to be more CPU efficient
+        # Wrap around with numpy take. Use np.take only where necessary (since it's CPU intense)
         if (farthest_idx > closest_idx):
             lane.waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
         else:
@@ -153,7 +154,12 @@ class WaypointUpdater(object):
 
 
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
+        """
+        Get the traffic light information from /traffic_waypoint
+        """
+        # Get traffic light index
+        self.traffic_light_WP = msg
+
         pass
 
     def obstacle_cb(self, msg):

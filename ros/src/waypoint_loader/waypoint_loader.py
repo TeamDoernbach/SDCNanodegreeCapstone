@@ -78,6 +78,7 @@ class WaypointLoader(object):
         return waypoints
 
     def publish(self, waypoints):
+        rate = rospy.Rate(1)    # 1Hz is sufficient. 
         lane = Lane()
         lane.header.frame_id = '/world'
         lane.header.stamp = rospy.Time(0)
