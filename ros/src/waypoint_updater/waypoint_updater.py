@@ -89,19 +89,18 @@ class WaypointUpdater(object):
         # Regular case: somewhere in between the waypoint list
         if (closest_idx > 0):
             prev_idx = closest_idx - 1
-            prev_coord = self.waypoints_2d[prev_idx]
         # Wrap-around case: closest waypoint equals zero (begin of list) --> wrap-around
         elif (closest_idx == 0):
             prev_idx = len(self.waypoints_2d)-1                # choose last index of list
-            prev_coord = self.waypoints_2d[prev_idx]
         # Warning case: negative number found
         else:
             prev_idx = closest_idx - 1
-            prev_coord = self.waypoints_2d[prev_idx]
             log_str = 'waypoint_updater.py: WARNING! closest_idx < 0, not plausible! '
             log_str += 'prev_wp=' + str(prev_idx) + ', '
             log_str += 'curr_wp=' + str(closest_idx)
             rospy.logwarn(log_str)
+        # Extract coordinate from previous ID
+        prev_coord = self.waypoints_2d[prev_idx]
 
         # Equation for hyperplane through closest_coords
         cl_vect = np.array(closest_coord)
