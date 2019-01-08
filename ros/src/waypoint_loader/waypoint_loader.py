@@ -13,6 +13,7 @@ import rospy
 
 CSV_HEADER = ['x', 'y', 'z', 'yaw']
 MAX_DECEL = 1.0
+WRAP_AROUND = True      # Wrap-around: False=drive one lap, True=drive endlessly
 
 
 class WaypointLoader(object):
@@ -54,7 +55,12 @@ class WaypointLoader(object):
                 p.twist.twist.linear.x = float(self.velocity)
 
                 waypoints.append(p)
-        return self.decelerate(waypoints)
+        # In starter code, decelaration was issued for last points to make car stop gently.
+        # For wrap-around / endless driving mode, this step is not helpful and therefore unused.
+        if WRAP_AROUND:
+            return waypoints
+        else:
+            return self.decelerate(waypoints)
 
     def distance(self, p1, p2):
         x, y, z = p1.x - p2.x, p1.y - p2.y, p1.z - p2.z
