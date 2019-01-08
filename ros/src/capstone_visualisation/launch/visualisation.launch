@@ -3,5 +3,5 @@
     <node pkg="rviz" type="rviz" name="rviz"
         args="-d $(find capstone_visualisation)/launch/parse.rviz"/>
 
-    <node pkg="capstone_visualisation" type="visualise.py" 	name="visualise_helper_node" />
+    <node pkg="capstone_visualisation" type="visualise.py" name="visualise_helper_node" />
 </launch>
