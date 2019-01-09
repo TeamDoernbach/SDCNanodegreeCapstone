@@ -31,10 +31,10 @@ class Controller(object):
 
         # Speed throttle controller
         kp = 0.8  # Proportional term
-        ki = 0.5  # Integral term
-        kd = 0.1  # Differential term
-        mn = self.decel_limit  # Min throttle value
-        mx = self.accel_limit  # Max throttle value
+        ki = 0.4  # Integral term
+        kd = 1.0  # Differential term
+        mn = 0.0  # Min throttle value
+        mx = self.accel_limit * 0.8  # Max throttle value
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
         self.distance_to_accel_limit = 0.0
 
@@ -98,14 +98,17 @@ class Controller(object):
             throttle = 0.
             decel = max(vel_error, self.decel_limit)
             brake = abs(decel)*self.vehicle_mass*self.wheel_radius    # Torque Nm
+        # Slow down the speed
+        elif vel_error >= abs(3.0) and steering > abs(0.2):
+            throttle -= throttle * abs(self.decel_limit)
 
-        steering = self.stabilize_steering(steering, vel_error)
+        #steering = self.stabilize_steering(steering, vel_error)
 
-        spd_multiplier = self.speed_multiplier(one_second_elapsed)
-        self.distance_from_accel_limit = self.accel_limit - throttle
+        #spd_multiplier = self.speed_multiplier(one_second_elapsed)
+        #self.distance_from_accel_limit = self.accel_limit - throttle
 
-        throttle += spd_multiplier * self.distance_from_accel_limit
-        
+        #throttle += spd_multiplier * self.distance_from_accel_limit
+         
         rospy.logwarn("Throttle:   {0}".format(throttle))
         #rospy.logwarn("Brake:    {0}".format(brake))
         #rospy.logwarn("Steering:    {0}".format(steering))
