@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="doernbach_debug_view" type="doernbach_debug_view.py" name="doernbach_debug_view" />
+</launch>

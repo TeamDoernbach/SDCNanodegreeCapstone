@@ -46,8 +46,9 @@ class TLDetector(object):
         self.light_classifier = TLClassifier()
         self.listener = tf.TransformListener()
 
-        self.state = TrafficLight.UNKNOWN
-        self.last_state = TrafficLight.UNKNOWN
+        self.new_state = TrafficLight.UNKNOWN
+        self.curr_state = TrafficLight.UNKNOWN
+        self.old_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
 
@@ -78,23 +79,80 @@ class TLDetector(object):
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
 
+
         '''
         Publish upcoming red lights at camera frequency.
         Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
         of times till we start using it. Otherwise the previous stable state is
         used.
         '''
-        if self.state != state:
-            self.state_count = 0
-            self.state = state
-        elif self.state_count >= STATE_COUNT_THRESHOLD:
-            self.last_state = self.state
-            light_wp = light_wp if state == TrafficLight.RED else -1
+
+#        if (self.state == TrafficLight.RED):
+#            if ((state == TrafficLight.YELLOW) or (state == TrafficLight.GREEN)):
+#
+#
+#        elif (self.state == TrafficLight.YELLOW):
+#            asdf
+#        elif (self.state == TrafficLight.GREEN):
+#            asdf
+
+        # Update traffic light status attributes
+        if state != self.curr_state:
+            # Detected traffic light color differs from known state
+            if state != self.new_state:
+                # New TL status was not yet detected at all, reset counter
+                self.state_count = 0
+                self.new_state = state
+            else:
+                # New TL status was already detected, increase counter
+                self.state_count += 1
+
+            if self.state_count >= STATE_COUNT_THRESHOLD:
+                # Threshold value for TL status detections exceeded. TL status safely detected
+                self.old_state = self.curr_state
+                self.curr_state = self.new_state
+
+        # Decision making
+        self.last_wp = light_wp
+        # GREEN
+        if self.curr_state == TrafficLight.GREEN:
+            # Green is no issue, publish -1
+            self.last_wp = -1
+        # YELLOW
+        elif self.curr_state == TrafficLight.YELLOW:
+            # Yellow can be an issue, depending on previous state
+            if self.old_state == TrafficLight.GREEN:
+                # Traffic light is switching to red
+                # TODO: HERE WE NEED DETECTION IF DISTANCE IS SUFFICIENTLY SMALL TO GO OVER YELLOW
+                self.last_wp = light_wp
+            else:
+                # Traffic light is switching to green
+                # NOTE: it was found, this situation does not exist in simulator!
+                self.last_wp = -1
+        # RED
+        elif self.curr_state == TrafficLight.RED:
+            # Red is always an issue, if close enough
             self.last_wp = light_wp
-            self.upcoming_red_light_pub.publish(Int32(light_wp))
+        # UNKNOWN
         else:
-            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-        self.state_count += 1
+            # For sake of simplicity, is treated in same way as green
+            self.last_wp = -1
+        # Detection done, publish message
+        self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+
+#        # OLD CODE    #
+#        elif self.state_count >= STATE_COUNT_THRESHOLD:
+#            # Threshold exceeded, high certainty in detection
+#            # Check previous state
+#            if (state != TrafficLight.RED) and (state != TrafficLight.YELLOW):
+#                light_wp = -1
+#
+#            self.last_state = self.state
+#            self.last_wp = light_wp
+#            self.upcoming_red_light_pub.publish(Int32(light_wp))
+#        else:
+#            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+#        self.state_count += 1
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
@@ -114,8 +172,8 @@ class TLDetector(object):
         # point = [pose.position.x, pose.position.y]
         # print point
         # print x, y
-        
-        return self.waypoint_tree.query([x, y])[1]
+
+        return self.waypoint_tree.query([x, y],1)[1]
 
     def get_light_state(self, light):
         """Determines the current color of the traffic light
@@ -174,7 +232,7 @@ class TLDetector(object):
         if closest_light:
             state = self.get_light_state(light)
             return line_wp_idx, state
-        self.waypoints = None
+        # self.waypoints = None
         return -1, TrafficLight.UNKNOWN
 
 if __name__ == '__main__':
