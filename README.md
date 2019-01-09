@@ -55,6 +55,13 @@ source devel/setup.sh
 roslaunch launch/styx.launch
 ```
 4. Run the simulator
+  4.1 Run the Simulator with visualisation
+   ```bash
+cd ros
+catkin_make
+source devel/setup.sh
+roslaunch launch/vis.launch use_ground_truth:=True
+```
 
 ### Real world testing
 1. Download [training bag](https://s3-us-west-1.amazonaws.com/udacity-selfdrivingcar/traffic_light_bag_file.zip) that was recorded on the Udacity self-driving car.
