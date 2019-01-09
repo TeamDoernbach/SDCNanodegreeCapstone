@@ -55,7 +55,7 @@ source devel/setup.sh
 roslaunch launch/styx.launch
 ```
 4. Run the simulator
-  4.1 Run the Simulator with visualisation
+  ### Run the Simulator with visualisation
    ```bash
 cd ros
 catkin_make
