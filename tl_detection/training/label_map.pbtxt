@@ -1,0 +1,12 @@
+item {
+	id: 1
+	name: 'tl_red'
+}
+item {
+	id: 2
+	name: 'tl_yellow'
+}
+item {
+	id: 3
+	name: 'tl_green'
+}
