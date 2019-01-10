@@ -7,11 +7,11 @@ import argparse
 # modified: https://github.com/datitran/raccoon_dataset/blob/master/xml_to_csv.py
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('source_dir', help='directory containing image files and corresponding '
-                                       'annotations (labels) in VOC XML format')
-parser.add_argument('csv_filename', help='name of the CSV file to be created')
-args = parser.parse_args()
+# parser = argparse.ArgumentParser()
+# parser.add_argument('source_dir', help='directory containing image files and corresponding '
+#                                        'annotations (labels) in VOC XML format')
+# parser.add_argument('csv_filename', help='name of the CSV file to be created')
+# args = parser.parse_args()
 
 def xml_to_csv(path):
     xml_list = []
@@ -34,7 +34,18 @@ def xml_to_csv(path):
     return xml_df
 
 
-if __name__ == "__main__":
-    xml_df = xml_to_csv(args.source_dir)
-    xml_df.to_csv(args.csv_filename, index=None)
-    print('Successfully converted xml to csv.')
+def main():
+    for directory in ['train','test']:
+        image_path = os.path.join(os.getcwd(), 'images/{}'.format(directory))
+        xml_df = xml_to_csv(image_path)
+        xml_df.to_csv('data/{}_labels.csv'.format(directory), index=None)
+        print('Successfully converted xml to csv.')
+
+main()
+
+
+
+# if __name__ == "__main__":
+#     xml_df = xml_to_csv(args.source_dir)
+#     xml_df.to_csv(args.csv_filename, index=None)
+#     print('Successfully converted xml to csv.')
