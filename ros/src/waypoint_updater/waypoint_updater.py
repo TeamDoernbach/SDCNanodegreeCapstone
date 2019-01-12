@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 from scipy.spatial import KDTree
@@ -50,6 +50,8 @@ class WaypointUpdater(object):
         self.waypoints_2d = None
         self.waypoint_tree = None
         self.traffic_light_WP = None
+        self.WP_ego = None
+        self.distances = []
 
         self.loop()
 
@@ -66,6 +68,7 @@ class WaypointUpdater(object):
             if self.pose and self.waypoint_tree:
                 # Get closest waypoint
                 closest_waypoint_idx = self.get_closest_waypoint_idx()
+                self.WP_ego = closest_waypoint_idx
 
                 # Set farthest waypoint. No wrap-around necessary here! This is done in next func
                 farthest_waypoint_idx = closest_waypoint_idx + LOOKAHEAD_WPS
@@ -158,6 +161,7 @@ class WaypointUpdater(object):
     def waypoints_cb(self, waypoints):
         """
         Get the waypoint values from /base_waypoints
+        Calculate distance array once and save CPU time during loop operation
         """
         # TODO: Implement
         self.base_waypoints = waypoints
@@ -165,7 +169,19 @@ class WaypointUpdater(object):
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] \
                                 for waypoint in waypoints.waypoints]
             self.waypoint_tree = KDTree(self.waypoints_2d)
-
+        # Create distance array in order to calculate distances just once for all waypoints and
+        # over and over with every time step
+        if not self.distances:
+            prev_WP = None
+            j = 0
+            for curr_WP in waypoints.waypoints:
+                if (j == 0):
+                    self.distances.append(0.)
+                else:
+                    dist_cum = distance(self, waypoints, prev_WP, curr_WP) + self.distances[j-1]
+                    self.distances.append(dist_cum)
+                prev_WP = curr_WP
+                j += 1
 
     def traffic_cb(self, msg):
         """
@@ -193,6 +209,30 @@ class WaypointUpdater(object):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
+
+    def calc_slowdown_WPs(self, waypoints):
+        WP_ego = self.WP_ego
+        WP_stop = self.traffic_light_WP
+
+        # Calculate distance between ego and stop line
+        dist = distance()
+
+        # Calculate distance needed to stop
+        #s = 1/2 a*t^2
+        #t = v/a
+        #dist_brake = 1/2 v^2/a
+
+        # Calculate waypoint where braking should start
+        WP_brake = 0
+
+        # Optional: Slow-down
+        # Calculate distance useful to disengage trottle, maybe a simple function of speed
+        # dist_slowdown =
+
+        # Define waypoint, where slowdown (i.e. throttle = 0) should start
+        WP_slowdown = 0
+
+        return None
 
 
 if __name__ == '__main__':
