@@ -54,6 +54,8 @@ class WaypointUpdater(object):
         self.WP_idx_ego = None
         self.WP_idx_brake = None
         self.WP_idx_slowdown = None
+        self.brake_dist = None
+        self.slowdown_dist = None
         self.distances = []
 
         self.loop()
@@ -135,7 +137,9 @@ class WaypointUpdater(object):
             ego_speed
             StartBraking_WP (with 0.8x decel_limit to have some buffer)
             """
+            # Check where latest slowdown points acutally
             calc_slowdown_WPs(self, waypoints)
+            lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
             # Check if ego vehicle is already in area where braking should occur
             """
             if ego_curr_WP > StartBraking_WP:
@@ -154,6 +158,26 @@ class WaypointUpdater(object):
         # Publish final waypoints to ROS
         self.final_waypoints_pub.publish(lane)
         pass
+
+    def decelerate_waypoints(waypoints):
+        WPs_temp = []
+        stop_idx = self.WP_idx_traffic_light
+        brake_dist = self.brake_dist
+        base_vel = waypoints[100].twist.twist.linear.x
+
+        for i, wp in enumerate(waypoints):
+            p = Waypoint()
+            p.pose = wp.pose
+
+            dist = self.distances[stop_idx] - self.distances[i]
+            if dist < brake_dist:
+                vel = 0.5 * self.velocity * (1 - cos(np.pi/brake_dist * dist))
+                if vel < 1.:
+                    vel = 0.
+                p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
+            WPs_temp.append(p)
+            
+        return WPs_temp
 
     def pose_cb(self, msg):
         """
@@ -231,8 +255,8 @@ class WaypointUpdater(object):
         dist_brake = (self.velocity)^2 / (self.decel_limit) # s = 0.5 * v^2 / a with a=0.5*a_lim
 
         # Calculate waypoint where braking should start
-        dist_coord_brake = self.distances(self.WP_idx_traffic_light) - dist_brake
-        self.WP_idx_brake = bisect_left(self.distances, dist_coord_brake)
+        self.brake_dist = self.distances(self.WP_idx_traffic_light) - dist_brake
+        self.WP_idx_brake = bisect_left(self.distances, self.brake_dist)
 
         # Optional: Slow-down
         # Calculate distance useful to disengage trottle, maybe a simple function of speed
@@ -240,8 +264,8 @@ class WaypointUpdater(object):
         # dist_slowdown =
 
         # Calculate distance needed, where releasing throttle would be useful
-        dist_slowdown = (self.velocity)^2 / (self.decel_limit) # s = 0.5 * v^2 / a with a=0.5*a_lim
-        self.WP_idx_slowdown = bisect_left(self.distances, dist_coord_brake)
+        self.slowdown_dist = (self.velocity)^2 / (self.decel_limit) # s = 0.5 * v^2 / a with a=0.5*a_lim
+        self.WP_idx_slowdown = bisect_left(self.distances, self.slowdown_dist)
 
         pass
 
