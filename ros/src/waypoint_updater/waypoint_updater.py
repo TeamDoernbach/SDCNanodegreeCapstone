@@ -42,6 +42,7 @@ class WaypointUpdater(object):
 
         # Get vehicle parameters from rospy server. Fallback to -5m/s^2, in case value is missing
         decel_limit = rospy.get_param('~decel_limit',-5)
+        slowdown_accel = 0.5    # m/s^2 expected with throttle released
 
         # TODO: Add other member variables you need below
         self.pose = None
@@ -49,8 +50,10 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoint_tree = None
-        self.traffic_light_WP = None
-        self.WP_ego = None
+        self.WP_idx_traffic_light = None
+        self.WP_idx_ego = None
+        self.WP_idx_brake = None
+        self.WP_idx_slowdown = None
         self.distances = []
 
         self.loop()
@@ -68,7 +71,7 @@ class WaypointUpdater(object):
             if self.pose and self.waypoint_tree:
                 # Get closest waypoint
                 closest_waypoint_idx = self.get_closest_waypoint_idx()
-                self.WP_ego = closest_waypoint_idx
+                self.WP_idx_ego = closest_waypoint_idx
 
                 # Set farthest waypoint. No wrap-around necessary here! This is done in next func
                 farthest_waypoint_idx = closest_waypoint_idx + LOOKAHEAD_WPS
@@ -123,27 +126,34 @@ class WaypointUpdater(object):
         """
         lane = Lane()
         lane.header = self.base_waypoints.header
-        # Wrap around with numpy take. Use np.take only where necessary (since it's CPU intense)
-        if (farthest_idx > closest_idx):
-            lane.waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
-        else:
-            indices = range(closest_idx,farthest_idx)
-            lane.waypoints = np.take(self.base_waypoints.waypoints,indices,mode='wrap')
+
         # In case traffic light signal >= 0, calculate waypoint index, where slow down must start
-        if (self.traffic_light_WP > -1):
+        if (self.WP_idx_traffic_light > -1):
             """
             ego_curr_WP
             TrafficLight_WP
             ego_speed
             StartBraking_WP (with 0.8x decel_limit to have some buffer)
             """
-        # Check if ego vehicle is already in area where braking should occur
-        """
-        if ego_curr_WP > StartBraking_WP:
-            linearly interpolate speed until stop point
+            calc_slowdown_WPs(self, waypoints)
+            # Check if ego vehicle is already in area where braking should occur
+            """
+            if ego_curr_WP > StartBraking_WP:
+                linearly interpolate speed until stop point
 
-        """
+            """
+        else:
+            # Use base waypoints, as no slow down is necessary.
+            # Wrap around with numpy take. Use np.take only where necessary (since it's CPU intense)
+            if (farthest_idx > closest_idx):
+                lane.waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
+            else:
+                indices = range(closest_idx,farthest_idx)
+                lane.waypoints = np.take(self.base_waypoints.waypoints,indices,mode='wrap')
+
+        # Publish final waypoints to ROS
         self.final_waypoints_pub.publish(lane)
+        pass
 
     def pose_cb(self, msg):
         """
@@ -188,8 +198,7 @@ class WaypointUpdater(object):
         Get the traffic light information from /traffic_waypoint
         """
         # Get traffic light index
-        self.traffic_light_WP = msg
-
+        self.WP_idx_traffic_light = msg
         pass
 
     def obstacle_cb(self, msg):
@@ -211,29 +220,32 @@ class WaypointUpdater(object):
         return dist
 
     def calc_slowdown_WPs(self, waypoints):
-        WP_ego = self.WP_ego
-        WP_stop = self.traffic_light_WP
+        WP_ego = self.WP_idx_ego
+        WP_stop = self.WP_idx_traffic_light
 
         # Calculate distance between ego and stop line
-        dist = distance()
+        dist = self.distances(self.WP_idx_traffic_light) - self.distances(self.WP_idx_ego)
+        # TODO: add wrap-around
 
-        # Calculate distance needed to stop
-        #s = 1/2 a*t^2
-        #t = v/a
-        #dist_brake = 1/2 v^2/a
+        # Calculate distance needed to stop (s = 1/2 a*t^2, t = v/a)
+        dist_brake = (self.velocity)^2 / (self.decel_limit) # s = 0.5 * v^2 / a with a=0.5*a_lim
 
         # Calculate waypoint where braking should start
-        WP_brake = 0
+        dist_coord_brake = self.distances(self.WP_idx_traffic_light) - dist_brake
+        self.WP_idx_brake = bisect_left(self.distances, dist_coord_brake)
 
         # Optional: Slow-down
         # Calculate distance useful to disengage trottle, maybe a simple function of speed
+        # Expected acceleration value: a = 0.6m/s^2
         # dist_slowdown =
 
-        # Define waypoint, where slowdown (i.e. throttle = 0) should start
-        WP_slowdown = 0
+        # Calculate distance needed, where releasing throttle would be useful
+        dist_slowdown = (self.velocity)^2 / (self.decel_limit) # s = 0.5 * v^2 / a with a=0.5*a_lim
+        self.WP_idx_slowdown = bisect_left(self.distances, dist_coord_brake)
 
-        return None
+        pass
 
+    def
 
 if __name__ == '__main__':
     try:
