@@ -49,13 +49,6 @@ class Controller(object):
         # Get current time stamp during initialization
         self.last_time = rospy.get_time()
 
-        # Initialize speed accelerator
-        self.max_acceleration = 1.0
-        self.multiply_acceleration = 0.0
-        self.distance_from_accel_limit = 0.0
-
-
-
     def control(self, current_vel, dbw_enabled, linear_vel, angular_vel, one_second_elapsed):
         # TODO: Change the arg, kwarg list to suit your needs
         # Return throttle, brake, steer
@@ -63,9 +56,6 @@ class Controller(object):
         # During manual operation, reset throttle controller to avoid false growth of integral term
         # Return zero for all controller inputs
         if not dbw_enabled:
-            self.multiply_acceleration = 0.0
-            self.distance_from_accel_limit = 0.0
-
             self.throttle_controller.reset()
             return 0., 0., 0.
 
