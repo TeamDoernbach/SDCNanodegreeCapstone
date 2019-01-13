@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 from scipy.spatial import KDTree
 import numpy as np
 import math
+from bisect import bisect_left
 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
@@ -31,6 +32,7 @@ class WaypointUpdater(object):
         rospy.init_node('waypoint_updater')
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
@@ -39,12 +41,25 @@ class WaypointUpdater(object):
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
+        # Get vehicle parameters from rospy server. Fallback to -5m/s^2, in case value is missing
+        self.decel_limit = rospy.get_param('~decel_limit',-5)
+        self.decel_slowdown = 0.5    # m/s^2 expected with throttle released
+
         # TODO: Add other member variables you need below
         self.pose = None
+        self.velocity = None
+        self.velocity_curr = None
         self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoint_tree = None
-        self.traffic_light_WP = None
+        self.WP_idx_traffic_light = -1
+        self.WP_idx_ego = None
+        self.WP_idx_brake = None
+        self.WP_idx_slowdown = None
+        self.ego_dist = None
+        self.brake_dist = None
+        self.slowdown_dist = None
+        self.distances = []
 
         self.loop()
 
@@ -52,7 +67,7 @@ class WaypointUpdater(object):
         """
         Initialize the waypoint updater. Only run while the DWB system is enabled
         (automate throttle, brake, steering control system)
-        
+
         The frequency of this publishing loop is controlled by LOOP_HERTZ
         """
         rate = rospy.Rate(LOOP_HERTZ)
@@ -61,6 +76,7 @@ class WaypointUpdater(object):
             if self.pose and self.waypoint_tree:
                 # Get closest waypoint
                 closest_waypoint_idx = self.get_closest_waypoint_idx()
+                self.WP_idx_ego = closest_waypoint_idx
 
                 # Set farthest waypoint. No wrap-around necessary here! This is done in next func
                 farthest_waypoint_idx = closest_waypoint_idx + LOOKAHEAD_WPS
@@ -84,55 +100,138 @@ class WaypointUpdater(object):
         # Regular case: somewhere in between the waypoint list
         if (closest_idx > 0):
             prev_idx = closest_idx - 1
-            prev_coord = self.waypoints_2d[prev_idx]
-            #log_str = 'waypoint_updater.py: regular case, no wrap-around. '
-            #log_str += 'prev_wp=' + str(prev_idx) + ', '
-            #log_str += 'curr_wp=' + str(closest_idx)
-            #rospy.loginfo(log_str)
-            #rospy.loginfo_throttle(1,log_str) # Print log only each second for a smaller log file
         # Wrap-around case: closest waypoint equals zero (begin of list) --> wrap-around
         elif (closest_idx == 0):
             prev_idx = len(self.waypoints_2d)-1                # choose last index of list
-            prev_coord = self.waypoints_2d[prev_idx]
-            #log_str = 'waypoint_updater.py: lower-bound wrap around occured. '
-            #log_str += 'prev_wp=' + str(prev_idx) + ', '
-            #log_str += 'curr_wp=' + str(closest_idx)
-            #rospy.loginfo(log_str)
         # Warning case: negative number found
         else:
             prev_idx = closest_idx - 1
-            prev_coord = self.waypoints_2d[prev_idx]
             log_str = 'waypoint_updater.py: WARNING! closest_idx < 0, not plausible! '
             log_str += 'prev_wp=' + str(prev_idx) + ', '
             log_str += 'curr_wp=' + str(closest_idx)
             rospy.logwarn(log_str)
+        # Extract coordinate from previous ID
+        prev_coord = self.waypoints_2d[prev_idx]
 
         # Equation for hyperplane through closest_coords
         cl_vect = np.array(closest_coord)
         prev_vect = np.array(prev_coord)
         pos_vect = np.array([x, y])
 
+        # Check if value is really ahead or behind ego vehicle
         val = np.dot(cl_vect - prev_vect, pos_vect - cl_vect)
-
         if val > 0:
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
-
+        # Return value
         return closest_idx
 
     def publish_waypoints(self, closest_idx, farthest_idx):
         """
-        Creating new lane object for the car
+        Creating new lane object for the car. Includes acceleration/deceleration logic
         """
         lane = Lane()
         lane.header = self.base_waypoints.header
-        # Wrap around with numpy take. Use np.take only where necessary (since it's CPU intense)
+        # Read waypoints to generate horizon including wrap-around
         if (farthest_idx > closest_idx):
-            lane.waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
+            horizon_waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
         else:
             indices = range(closest_idx,farthest_idx)
-            lane.waypoints = np.take(self.base_waypoints.waypoints,indices,mode='wrap')
+            horizon_waypoints = np.take(self.base_waypoints.waypoints,indices,mode='wrap')
 
+        # Check if traffic light signal and proximity to stop line require deceleration
+        if ((self.WP_idx_traffic_light == -1) or (self.WP_idx_traffic_light > farthest_idx)):
+            # Reset speed to target velocity if TL ahead is not yellow/red or too far away
+            # This step was necessary to get the car moving again after TL turns green
+            for j, wp in enumerate(horizon_waypoints):
+                horizon_waypoints[j].twist.twist.linear.x = self.velocity
+            lane.waypoints = horizon_waypoints
+        else:
+            # Check where latest slowdown points are
+            self.calc_slowdown_WPs()
+            # Update speed values of horizon waypoints
+            lane.waypoints = self.decelerate_waypoints(horizon_waypoints, closest_idx, farthest_idx)
+
+        # Publish final lane waypoints to ROS
         self.final_waypoints_pub.publish(lane)
+        pass
+
+    def decelerate_waypoints(self, waypoints, closest_idx, farthest_idx):
+        """
+        Deceleration: adjust speed values of waypoints for slowing down
+        """
+        WPs_temp = []
+        stop_idx = self.WP_idx_traffic_light    # Index of traffic light
+        brake_dist = self.brake_dist            # Distance necessary to stop in time
+        base_vel = self.velocity                # Target velocity, if undisturbed
+
+        # Walk through horizon waypoints and adjust speed values
+        for i, wp in enumerate(waypoints):
+            p = Waypoint()
+            p.pose = wp.pose
+            p.twist = wp.twist
+            # Calculate distance of each horizon waypoint to stop line
+            dist = self.distances[stop_idx] - self.distances[i+closest_idx]
+            # Adjust speed, if waypoint is within distance necessary to stop in time
+            if dist < brake_dist:
+                # New target velocity value, dependent on
+                #   - target speed (e.g. cruise control set speed)
+                #   - distance foreseen for decelerating
+                #   - current distance of waypoint to traffic light stop line
+                vel = 0.5 * self.velocity * (1 - np.cos(np.pi/brake_dist * dist))
+                # Pull velocity down to zero if it becomes very small
+                if vel < 1.:
+                    vel = 0.
+                # Use smaller value of either current velocity or new target velocity
+                p.twist.twist.linear.x = min(vel, self.velocity_curr)
+            # Add current waypoint to array
+            WPs_temp.append(p)
+        # Return updated horizon waypoints
+        return WPs_temp
+
+    def calc_slowdown_WPs(self):
+        """
+        Calculate slow down waypoints: for strong braking and gentle velocity reduction (unused)
+        """
+        WP_ego = self.WP_idx_ego
+        WP_stop = self.WP_idx_traffic_light
+
+        # Calculate distance between ego and stop line
+        self.ego_dist = self.distances[self.WP_idx_traffic_light] - self.distances[self.WP_idx_ego]
+
+        # Calculate distance needed to stop (s = 0.5*a*t^2, t = v/a)
+        # Formula: s = 0.5*v^2/a with a=0.5*a_lim --> 0.5 cancels out
+        self.brake_dist = abs(self.velocity*self.velocity / self.decel_limit)
+        # Calculate waypoint idx, where braking should start
+        WP_dist_brake = self.distances[self.WP_idx_traffic_light] - self.brake_dist
+        self.WP_idx_brake = bisect_left(self.distances, WP_dist_brake)
+
+        # Optional: gentle slow-down
+        # Calculate distance useful to disengage trottle
+        self.slowdown_dist = abs(self.velocity*self.velocity / self.decel_slowdown)
+        # Calculate waypoint idx, where gentle slowdown should start
+        WP_dist_slowdown = self.distances[self.WP_idx_traffic_light] - self.slowdown_dist
+        self.WP_idx_slowdown = bisect_left(self.distances, WP_dist_slowdown)
+        # Return to calling function
+        pass
+
+    def distance(self, waypoints, wp1, wp2):
+        """
+        Calculate distance between to waypoint idx which are further apart
+        """
+        dist = 0.
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+        for i in range(wp1, wp2+1):
+            dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
+            wp1 = i
+        return dist
+
+    def single_distance(self, waypoints, wp1, wp2):
+        """
+        Calculate distance between to waypoint idx, which are only seperated by one index
+        """
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+        dist = dl(waypoints[wp1].pose.pose.position, waypoints[wp2].pose.pose.position)
+        return dist
 
     def pose_cb(self, msg):
         """
@@ -141,9 +240,16 @@ class WaypointUpdater(object):
         # TODO: Implement
         self.pose = msg
 
+    def velocity_cb(self, msg):
+        """
+        Retrieve the current vehicle speed
+        """
+        self.velocity_curr = msg.twist.linear.x
+
     def waypoints_cb(self, waypoints):
         """
         Get the waypoint values from /base_waypoints
+        Calculate distance array once and save CPU time during loop operation
         """
         # TODO: Implement
         self.base_waypoints = waypoints
@@ -151,15 +257,29 @@ class WaypointUpdater(object):
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] \
                                 for waypoint in waypoints.waypoints]
             self.waypoint_tree = KDTree(self.waypoints_2d)
-
+        # Read out sample velocity
+        self.velocity = waypoints.waypoints[50].twist.twist.linear.x
+        # Create distance array in order to calculate distances just once for all waypoints and
+        # over and over with every time step
+        if not self.distances:
+            prev_WP = None
+            j = 0
+            for curr_WP in waypoints.waypoints:
+                if (j == 0):
+                    self.distances.append(0.)
+                else:
+                    dist_cum = self.single_distance(waypoints.waypoints, j-1, j) + self.distances[j-1]
+                    self.distances.append(dist_cum)
+                prev_WP = curr_WP
+                j += 1
+        pass
 
     def traffic_cb(self, msg):
         """
         Get the traffic light information from /traffic_waypoint
         """
         # Get traffic light index
-        self.traffic_light_WP = msg
-
+        self.WP_idx_traffic_light = msg.data
         pass
 
     def obstacle_cb(self, msg):
@@ -171,15 +291,6 @@ class WaypointUpdater(object):
 
     def set_waypoint_velocity(self, waypoints, waypoint, velocity):
         waypoints[waypoint].twist.twist.linear.x = velocity
-
-    def distance(self, waypoints, wp1, wp2):
-        dist = 0
-        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-        for i in range(wp1, wp2+1):
-            dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
-            wp1 = i
-        return dist
-
 
 if __name__ == '__main__':
     try:
