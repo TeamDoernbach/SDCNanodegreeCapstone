@@ -5,6 +5,7 @@ import rospy
 
 GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
+ACCELERATION_HYPERPARAMETER = 0.8
 
 
 class Controller(object):
@@ -34,7 +35,7 @@ class Controller(object):
         ki = 0.4  # Integral term
         kd = 1.0  # Differential term
         mn = 0.0  # Min throttle value
-        mx = self.accel_limit * 0.8  # Max throttle value
+        mx = self.accel_limit * ACCELERATION_HYPERPARAMETER  # Max throttle value
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
         self.distance_to_accel_limit = 0.0
 
@@ -48,13 +49,6 @@ class Controller(object):
         # Get current time stamp during initialization
         self.last_time = rospy.get_time()
 
-        # Initialize speed accelerator
-        self.max_acceleration = 1.0
-        self.multiply_acceleration = 0.0
-        self.distance_from_accel_limit = 0.0
-
-
-
     def control(self, current_vel, dbw_enabled, linear_vel, angular_vel, one_second_elapsed):
         # TODO: Change the arg, kwarg list to suit your needs
         # Return throttle, brake, steer
@@ -62,9 +56,6 @@ class Controller(object):
         # During manual operation, reset throttle controller to avoid false growth of integral term
         # Return zero for all controller inputs
         if not dbw_enabled:
-            self.multiply_acceleration = 0.0
-            self.distance_from_accel_limit = 0.0
-
             self.throttle_controller.reset()
             return 0., 0., 0.
 
@@ -101,13 +92,6 @@ class Controller(object):
         # Slow down the speed
         elif vel_error >= abs(3.0) and steering > abs(0.2):
             throttle -= throttle * abs(self.decel_limit)
-
-        #steering = self.stabilize_steering(steering, vel_error)
-
-        #spd_multiplier = self.speed_multiplier(one_second_elapsed)
-        #self.distance_from_accel_limit = self.accel_limit - throttle
-
-        #throttle += spd_multiplier * self.distance_from_accel_limit
          
         rospy.logwarn("Throttle:   {0}".format(throttle))
         #rospy.logwarn("Brake:    {0}".format(brake))
@@ -115,28 +99,3 @@ class Controller(object):
         rospy.logwarn("Velocity error: {0}".format(vel_error))
 
         return throttle, brake, steering
-
-    def stabilize_steering(self, steering, vel_error):
-        """
-        Stabilize the steering angle
-        """
-        if vel_error <= abs(0.001):
-            if steering > 0:
-                return steering - abs(vel_error)
-            else:
-                return steering + abs(vel_error)
-        elif vel_error >= abs(1.0) and steering == 0.0:
-            return steering
-        else:
-            if steering > 0:
-                return steering + abs(vel_error)
-            else:
-                return steering - abs(vel_error)
-
-    def speed_multiplier(self, one_second_elapsed):
-        if one_second_elapsed == True:
-            self.multiply_acceleration += 0.1
-            if self.multiply_acceleration > self.max_acceleration:
-                self.multiply_acceleration = self.max_acceleration
-             
-        return self.multiply_acceleration
