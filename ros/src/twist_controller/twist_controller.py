@@ -31,11 +31,12 @@ class Controller(object):
 
         # Speed throttle controller
         kp = 0.8  # Proportional term
-        ki = 0.1  # Integral term
-        kd = 0.1  # Differential term
+        ki = 0.4  # Integral term
+        kd = 1.0  # Differential term
         mn = 0.0  # Min throttle value
-        mx = 0.8  # Max throttle value
+        mx = self.accel_limit * 0.8  # Max throttle value
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
+        self.distance_to_accel_limit = 0.0
 
         # Define low-pass filter settings
         tau = 0.5  # 1/(2pi*tau) = cutoff frequency
@@ -47,14 +48,23 @@ class Controller(object):
         # Get current time stamp during initialization
         self.last_time = rospy.get_time()
 
+        # Initialize speed accelerator
+        self.max_acceleration = 1.0
+        self.multiply_acceleration = 0.0
+        self.distance_from_accel_limit = 0.0
 
-    def control(self, current_vel, dbw_enabled, linear_vel, angular_vel):
+
+
+    def control(self, current_vel, dbw_enabled, linear_vel, angular_vel, one_second_elapsed):
         # TODO: Change the arg, kwarg list to suit your needs
         # Return throttle, brake, steer
 
         # During manual operation, reset throttle controller to avoid false growth of integral term
         # Return zero for all controller inputs
         if not dbw_enabled:
+            self.multiply_acceleration = 0.0
+            self.distance_from_accel_limit = 0.0
+
             self.throttle_controller.reset()
             return 0., 0., 0.
 
@@ -88,13 +98,21 @@ class Controller(object):
             throttle = 0.
             decel = max(vel_error, self.decel_limit)
             brake = abs(decel)*self.vehicle_mass*self.wheel_radius    # Torque Nm
+        # Slow down the speed
+        elif vel_error >= abs(3.0) and steering > abs(0.2):
+            throttle -= throttle * abs(self.decel_limit)
 
-        steering = self.stabilize_steering(steering, vel_error)
-        
-        #rospy.logwarn("Throttle:   {0}".format(throttle))
+        #steering = self.stabilize_steering(steering, vel_error)
+
+        #spd_multiplier = self.speed_multiplier(one_second_elapsed)
+        #self.distance_from_accel_limit = self.accel_limit - throttle
+
+        #throttle += spd_multiplier * self.distance_from_accel_limit
+         
+        rospy.logwarn("Throttle:   {0}".format(throttle))
         #rospy.logwarn("Brake:    {0}".format(brake))
         #rospy.logwarn("Steering:    {0}".format(steering))
-        #rospy.logwarn("Velocity error: {0}".format(vel_error))
+        rospy.logwarn("Velocity error: {0}".format(vel_error))
 
         return throttle, brake, steering
 
@@ -114,3 +132,11 @@ class Controller(object):
                 return steering + abs(vel_error)
             else:
                 return steering - abs(vel_error)
+
+    def speed_multiplier(self, one_second_elapsed):
+        if one_second_elapsed == True:
+            self.multiply_acceleration += 0.1
+            if self.multiply_acceleration > self.max_acceleration:
+                self.multiply_acceleration = self.max_acceleration
+             
+        return self.multiply_acceleration
