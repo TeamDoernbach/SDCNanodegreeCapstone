@@ -52,7 +52,7 @@ class Controller(object):
         current_vel = kwargs['current']
 
         vel_error = linear_vel - current_vel
-        rospy.logwarn("Velocity error: {0}".format(vel_error))
+        #rospy.logwarn("Velocity error: {0}".format(vel_error))
         delta = self.calcdeltasec()
         #rospy.logwarn("delta: {0}".format(delta))
         unfiltered_step = self.throttle_controller.step(vel_error, delta)
@@ -62,8 +62,8 @@ class Controller(object):
 
         steer = self.yaw_controller.get_steering(linear_vel, angular_vel, current_vel)
         steering = self.steer_controller.step(steer, delta)
-        rospy.logwarn("Steering: {0}".format(steering))
-        rospy.logwarn("Steer: {0}".format(steer))
+        #rospy.logwarn("Steering: {0}".format(steering))
+        #rospy.logwarn("Steer: {0}".format(steer))
         # return default
         throttle = 0.
         brake = 0.
