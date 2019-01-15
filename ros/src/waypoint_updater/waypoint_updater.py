@@ -53,13 +53,14 @@ class WaypointUpdater(object):
         #rospy.spin()
 
     def loop(self):
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(5)
         while not rospy.is_shutdown():
             if self.pose and self.base_lane:
                 self.publish_waypoints()
             rate.sleep()
 
     def get_closest_waypoint_idx(self):
+        """
         x = self.pose.pose.position.x
         y = self.pose.pose.position.y
         closest_idx = self.waypoint_tree.query([x, y], 1)[1]
@@ -78,11 +79,24 @@ class WaypointUpdater(object):
         # https://stackoverflow.com/questions/1878907/the-smallest-difference-between-2-angles
         angle_diff = math.atan2(math.sin(direction - self.vehicle_yaw),
                                 math.cos(direction - self.vehicle_yaw))
-        if val > 0 and (abs(angle_diff) < math.pi / 4.0):
+        if val > 0 and (abs(angle_diff) < math.pi / 6.0):
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
 
         return closest_idx
-
+        """
+        nearest_waypoint = [-1, 100000]  # index, ceiling for min distance
+        car_pos = self.pose.pose.position
+        for i in range(len(self.base_lane.waypoints)):
+            wp_pos = self.base_lane.waypoints[i].pose.pose.position
+            distance = self.euclid_distance(car_pos, wp_pos)
+            direction = math.atan2(car_pos.y - wp_pos.y, car_pos.x - wp_pos.x)
+            # https://stackoverflow.com/questions/1878907/the-smallest-difference-between-2-angles
+            angle_diff = math.atan2(math.sin(direction - self.vehicle_yaw),
+                                    math.cos(direction - self.vehicle_yaw))
+            if distance < (nearest_waypoint[1]) and (abs(angle_diff) < math.pi / 8.0):
+                 nearest_waypoint = [i, distance]
+            closest_idx = nearest_waypoint[0]
+        return closest_idx
     def publish_waypoints(self):
         final_lane = self.generate_lane()
         self.final_waypoints_pub.publish(final_lane)
@@ -114,12 +128,12 @@ class WaypointUpdater(object):
             stop_idx = max(self.stopline_wp_idx - closest_idx, 0) # 2 waypoints back from TL so car stops at line
             dist = self.distance(waypoints, i, stop_idx)
             if dist<brake_dist:
-                vel=0.5 * self.velocity * (1 - np.cos(np.pi/brake_dist * dist))
-                #vel = math.sqrt(2 * MAX_DECEL * dist)
+                #vel=0.5 * self.velocity * (1 - np.cos(np.pi/brake_dist * dist))
+                vel = math.sqrt(2 * MAX_DECEL * dist)
                 if vel < 1.:
                     vel = 0.
                 p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
-            temp.append(p)
+                temp.append(p)
 
         return temp
 
@@ -138,7 +152,7 @@ class WaypointUpdater(object):
         if not self.waypoints_2d:
             self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
             self.waypoint_tree = KDTree(self.waypoints_2d)
-        self.velocity = waypoints.waypoints[LOOKAHEAD_WPS].twist.twist.linear.x #Average?
+        self.velocity = waypoints.waypoints[70].twist.twist.linear.x #Average?
     def traffic_cb(self, msg):
         self.stopline_wp_idx = msg.data
 
