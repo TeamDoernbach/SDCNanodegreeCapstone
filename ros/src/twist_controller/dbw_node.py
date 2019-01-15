@@ -5,6 +5,7 @@ import math
 from std_msgs.msg import Bool
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 from geometry_msgs.msg import TwistStamped, Pose, PoseStamped
+
 from twist_controller import Controller
 from styx_msgs.msg import Waypoint, Lane
 
@@ -48,7 +49,8 @@ class DBWNode(object):
         self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd',
                                             ThrottleCmd, queue_size=1)
         self.brake_pub = rospy.Publisher('/vehicle/brake_cmd',
-                                         BrakeCmd, queue_size=1)
+                                        BrakeCmd,       queue_size=1)
+
         rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb, queue_size=1)
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb, queue_size=1)
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb, queue_size=1)
@@ -56,6 +58,22 @@ class DBWNode(object):
         rospy.Subscriber('/final_waypoints', Lane, self.final_waypoints_cb, queue_size=1)
         self.prev_action = '' # Decision Making
         self.current_pose = None
+        
+        # Create `Controller` object
+        # TODO: Clean up, since all inputs from Q&A video were blindly added for initial version,
+        #       where actually precisely zero inputs would be necessary.
+        self.controller = Controller(vehicle_mass   = vehicle_mass,
+                                    fuel_capacity   = fuel_capacity,
+                                    brake_deadband  = brake_deadband,
+                                    decel_limit     = decel_limit,
+                                    accel_limit     = accel_limit,
+                                    wheel_radius    = wheel_radius,
+                                    wheel_base      = wheel_base,
+                                    steer_ratio     = steer_ratio,
+                                    max_lat_accel   = max_lat_accel,
+                                    max_steer_angle = max_steer_angle)
+        
+        # Initialize necessary variables
         self.current_vel = None
         self.dbw_enabled = False
         self.final_waypoints = None
@@ -77,6 +95,8 @@ class DBWNode(object):
 
         self.controller = Controller(**control_init_params)
 
+        # Initialize vehicle actuator commands to zero
+        self.throttle = self.steering = self.brake = 0
 
         self.loop()
 

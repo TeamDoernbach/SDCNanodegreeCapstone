@@ -43,7 +43,6 @@ class Controller(object):
         self.last_time = curr_time
         return delta
 
-
     def control(self, *args, **kwargs):
         #TODO: Change the arg, kwarg list to suit your needs
         #Return throttle, brake, steer
