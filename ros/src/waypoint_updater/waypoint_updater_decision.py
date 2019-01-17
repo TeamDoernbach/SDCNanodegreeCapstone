@@ -59,7 +59,7 @@ class WaypointUpdater(object):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             if self.pose and self.base_lane:
-                self.get_closest_waypoint_idx()
+                #self.get_closest_waypoint_idx()
                 self.generate_lane()
             rate.sleep()
 
@@ -97,7 +97,7 @@ class WaypointUpdater(object):
             # https://stackoverflow.com/questions/1878907/the-smallest-difference-between-2-angles
             angle_diff = math.atan2(math.sin(direction - self.vehicle_yaw),
                                     math.cos(direction - self.vehicle_yaw))
-            if distance < (nearest_waypoint[1]) and (abs(angle_diff) < math.pi / 8.0):
+            if distance < (nearest_waypoint[1]) and (abs(angle_diff) < math.pi / 4):
                  nearest_waypoint = [i, distance]
             closest_idx = nearest_waypoint[0]
         self.current_waypoint_id = closest_idx
@@ -107,25 +107,26 @@ class WaypointUpdater(object):
 
     def generate_lane(self):
         waypoints = Lane()
+        self.get_closest_waypoint_idx()
 
         farthest_idx = self.current_waypoint_id + LOOKAHEAD_WPS
         base_waypoints = self.base_lane[self.current_waypoint_id:farthest_idx]
 
-        # If no light detected, publish base_waypoints
-        if (self.current_waypoint_id + LOOKAHEAD_WPS) < len(self.base_lane):
+        # No light detection thought
+        if (farthest_idx) < len(self.base_lane):
             waypoints.waypoints =copy.deepcopy(base_waypoints)
         else:
             path_1 = copy.deepcopy(self.base_lane[self.current_waypoint_id:])
-            path_2 = copy.deepcopy(self.base_lane[:LOOKAHEAD_WPS])
-            waypoints.waypoints = manip_1 + manip_2
+            path_2 = copy.deepcopy(self.base_lane[:LOOKAHEAD_WPS-40])
+            waypoints.waypoints = path_1 + path_2
         waypoints.waypoints = self.state_behaviour(waypoints.waypoints)
         self.final_waypoints_pub.publish(waypoints)
 
-    def speed_adjust(self, waypoints, multiplier = 1.0,action="following"):
+    def speed_adjust(self, waypoints, cons = 1.0,action="following"):
         self.waypoint_saved_speed = None
         if action == "following":
             for i in range(LOOKAHEAD_WPS):
-                waypoints[i].twist.twist.linear.x *= multiplier
+                waypoints[i].twist.twist.linear.x *= cons
             return waypoints
         else:
             for i in range(LOOKAHEAD_WPS):
@@ -133,15 +134,14 @@ class WaypointUpdater(object):
             return waypoints
     def decision(self):
         # Red light detected -to determine Light switch red to Green, distance between decision long choosen- Vehicle should be at first slowing down, then should be accelerate
-        # NOTE: I know the magic numbers!.
+        # NOTE: Magic numbers!. Change it
         if self.stopline_wp_idx >= 0:
             distance_to_tl = self.distance(self.current_waypoint_id, self.stopline_wp_idx)
-            print "Distance to TL: ", distance_to_tl
-            if distance_to_tl >= 80:
+            if distance_to_tl > 80:
                 self.behavior_state = "free"
-            elif 30 <= distance_to_tl < 80:
+            elif 50 < distance_to_tl < 80:
                 self.behavior_state = "careful"
-            elif 5 < distance_to_tl < 30:
+            elif 10 < distance_to_tl < 50:
                 self.behavior_state = "brake"
             else:
                 self.behavior_state = "extreme brake"
@@ -163,19 +163,20 @@ class WaypointUpdater(object):
 
         if self.behavior_state== "free":
             return self.speed_adjust(waypoints)
-        elif self.behavior_state == "careful":
-            return self.speed_adjust(waypoints,0.75)
-        elif self.behavior_state == "extreme brake":
-            return self.speed_adjust(waypoints,0.0,action="constant")
-        elif self.behavior_state == "change":
-            return self.speed_adjust(waypoints,0.4)
+        elif self.behavior_state == "careful":# Green, but can change
+            return self.speed_adjust(waypoints,0.8)
+        elif self.behavior_state == "extreme brake": # Red, extreme Hard Brake
+            return self.speed_adjust(waypoints,action="constant")
+        elif self.behavior_state == "change": # Unsure, change in Traffic light
+            return self.speed_adjust(waypoints,0.35)
         else:
+            # Red - Slowing Down
             return self.decelerate_waypoints(waypoints)
 
     def decelerate_waypoints(self, waypoints):
         dist_to_stop = self.distance(self.current_waypoint_id,self.stopline_wp_idx)
         stop_to_wp = self.stopline_wp_idx - self.current_waypoint_id
-        stop_to_wp = min(stop_to_wp-2, LOOKAHEAD_WPS) # to stop at line trivial
+        stop_to_wp = min(stop_to_wp, LOOKAHEAD_WPS) # 2 to stop at line trivial
         if self.waypoint_saved_speed is None:
             self.waypoint_saved_speed =  self.current_vel
 
@@ -187,7 +188,7 @@ class WaypointUpdater(object):
                               self.stopline_wp_idx) / dist_to_stop)
             waypoints[i].twist.twist.linear.x = waypoint_velocity
 
-        self.waypoint_saved_speed = waypoints[1].twist.twist.linear.x
+        self.waypoint_saved_speed = waypoints[1].twist.twist.linear.x # Highest Velocity
         return waypoints
 
     def velocity_cb(self, msg):
