@@ -3,7 +3,7 @@ from lowpass import LowPassFilter
 from yaw_controller import YawController
 import rospy
 import copy
-#import os
+import os
 
 GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
@@ -26,11 +26,11 @@ class Controller(object):
         self.yaw_controller = YawController(wheel_base, steer_ratio, min_speed, max_lat_accel,max_steer_angle)
         # Define low-pass filter settings
         tau =3 # 1/2(pi*tau) = cutoff frequnecy
-        ts = 0.02 # Sample time
+        ts = 1 # Sample time 0.2,0.5,0.7 
         self.vel_lpf = LowPassFilter(tau, ts)
         # Defined 2 PID Control
         kp_v= 1.6; ki_v= 0.001; kd_v = 0.; mn_v = self.decel_limit;mx_v = self.accel_limit;
-        kp_s=1.23; ki_s= 0.002; kd_s = 0.1;mn_s = -max_steer_angle;mx_s = max_steer_angle;
+        kp_s=0.8; ki_s= 0.005; kd_s = 0.4;mn_s = -max_steer_angle;mx_s = max_steer_angle;
         self.throttle_controller = PID(kp_v,ki_v,kd_v, mn_v,mx_v)
         self.steer_controller = PID(kp_s, ki_s, kd_s, mn_s, mx_s)
 
@@ -39,9 +39,10 @@ class Controller(object):
 
     def calcdeltasec(self):
         curr_time = rospy.get_time()
-        delta = curr_time - self.last_time if self.last_time else 0.02
+        delta = curr_time - self.last_time if self.last_time else 0.1
         self.last_time = curr_time
         return delta
+
 
     def control(self, *args, **kwargs):
         #TODO: Change the arg, kwarg list to suit your needs
