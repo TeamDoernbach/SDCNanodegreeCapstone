@@ -162,17 +162,17 @@ class WaypointUpdater(object):
         self.ego_dist = self.distances[self.WP_idx_traffic_light] - self.distances[self.WP_idx_ego]
 
         # Debug output
-        if all(value is not None for value in [self.WP_idx_ego, self.WP_idx_slowdown,
-            self.WP_idx_brake, self.velocity, lane.waypoints[0].twist.twist.linear.x,
-            self.ego_dist, self.brake_dist, self.slowdown_dist]):
-            str_out = 'EgoIDX=%i,SlwIDX=%i,BrkIDX=%i,StpIDX=%i. v_CC=%4.1f,v_cur=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
-                self.WP_idx_ego,self.WP_idx_slowdown,self.WP_idx_brake,self.WP_idx_traffic_light, \
-                self.velocity,self.velocity_curr,lane.waypoints[0].twist.twist.linear.x,self.slowing_down)
-            rospy.logwarn(str_out)
-            str_out = 'EgoDist=%4.1f,SlwDist=%4.1f,BrkDist=%4.1f. v_CC=%4.1f,v_cur=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
-                self.ego_dist,self.slowdown_dist,self.brake_dist, \
-                self.velocity,self.velocity_curr,lane.waypoints[0].twist.twist.linear.x,self.slowing_down)
-            rospy.logwarn(str_out)
+        # if all(value is not None for value in [self.WP_idx_ego, self.WP_idx_slowdown,
+        #     self.WP_idx_brake, self.velocity, lane.waypoints[0].twist.twist.linear.x,
+        #     self.ego_dist, self.brake_dist, self.slowdown_dist]):
+        #     str_out = 'EgoIDX=%i,SlwIDX=%i,BrkIDX=%i,StpIDX=%i. v_CC=%4.1f,v_cur=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
+        #         self.WP_idx_ego,self.WP_idx_slowdown,self.WP_idx_brake,self.WP_idx_traffic_light, \
+        #         self.velocity,self.velocity_curr,lane.waypoints[0].twist.twist.linear.x,self.slowing_down)
+        #     rospy.logwarn(str_out)
+        #     str_out = 'EgoDist=%4.1f,SlwDist=%4.1f,BrkDist=%4.1f. v_CC=%4.1f,v_cur=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
+        #         self.ego_dist,self.slowdown_dist,self.brake_dist, \
+        #         self.velocity,self.velocity_curr,lane.waypoints[0].twist.twist.linear.x,self.slowing_down)
+        #     rospy.logwarn(str_out)
 
         # Publish final lane waypoints to ROS
         self.final_waypoints_pub.publish(lane)
@@ -221,8 +221,8 @@ class WaypointUpdater(object):
 
             # Add current waypoint to array
             WPs_temp.append(wp)
-            if i == 0 or i == 39:
-                rospy.loginfo(' Horizon WP %02i: dist=%6.1f, v_targ=%4.1f' % (i,dist,wp.twist.twist.linear.x))
+            # if i == 0 or i == 39:
+            #     rospy.loginfo(' Horizon WP %02i: dist=%6.1f, v_targ=%4.1f' % (i,dist,wp.twist.twist.linear.x))
         # Return updated horizon waypoints
         return WPs_temp
 
