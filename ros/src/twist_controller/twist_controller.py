@@ -67,8 +67,8 @@ class Controller(object):
         #rospy.logwarn("Current velocity:   {0}".format(current_vel))
         #rospy.logwarn("Filtered velocity:  {0}".format(self.vel_lpf.get()))
 
-        steering = self.yaw_controller.get_steering(linear_vel, 
-                                                    angular_vel, 
+        steering = self.yaw_controller.get_steering(linear_vel,
+                                                    angular_vel,
                                                     current_vel)
 
         vel_error = linear_vel - current_vel
@@ -79,7 +79,7 @@ class Controller(object):
         self.last_time = current_time
 
         throttle = self.throttle_controller.step(vel_error, sample_time)
-        
+
         brake = 0.
 
         if ((linear_vel < 0.01) and (current_vel < 0.1)):    # Changed linear_vel == 0. to < 0.01
@@ -92,10 +92,10 @@ class Controller(object):
         # Slow down the speed
         elif vel_error >= abs(3.0) and steering > abs(0.2):
             throttle -= throttle * abs(self.decel_limit)
-         
-        rospy.logwarn("Throttle:   {0}".format(throttle))
+
+        #rospy.logwarn("Throttle:   {0}".format(throttle))
         #rospy.logwarn("Brake:    {0}".format(brake))
         #rospy.logwarn("Steering:    {0}".format(steering))
-        rospy.logwarn("Velocity error: {0}".format(vel_error))
+        #rospy.logwarn("Velocity error: {0}".format(vel_error))
 
         return throttle, brake, steering
