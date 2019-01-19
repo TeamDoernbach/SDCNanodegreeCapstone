@@ -43,7 +43,7 @@ class WaypointUpdater(object):
 
         # Get vehicle parameters from rospy server. Fallback to -5m/s^2, in case value is missing
         self.decel_limit = rospy.get_param('~decel_limit',-5)
-        self.decel_slowdown = -1.0    # m/s^2 slowdown deceleration rate
+        self.decel_slowdown = -1.5    # m/s^2 slowdown deceleration rate
 
         # TODO: Add other member variables you need below
         self.pose = None
