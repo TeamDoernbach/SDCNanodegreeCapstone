@@ -11,8 +11,11 @@ from scipy.spatial import KDTree
 import tf
 import cv2
 import yaml
+import os
 
 STATE_COUNT_THRESHOLD = 3
+USE_TL_CLASSIFIER = False
+GRAPH_PATH = os.path.join('..', '..', '..', 'tl_detection', 'frozen_inference_graph.pb')
 
 class TLDetector(object):
     def __init__(self):
@@ -43,7 +46,7 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+        self.light_classifier = TLClassifier(GRAPH_PATH)
         self.listener = tf.TransformListener()
 
         self.new_state = TrafficLight.UNKNOWN
@@ -185,19 +188,23 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        # the simulator tell us what state (Red/Yellow/Green) the TL is in.
+
+        # the simulator tells us what state (Red/Yellow/Green) the TL is in.
         # in reality we're gonna need a classifier to tell the state from the camera image
-        return light.state
+        if USE_TL_CLASSIFIER:
+            if(not self.has_image):
+                self.prev_light_loc = None
+                return False
 
-        # TODO: this code will be used when we implement TLClassifier
-        # if(not self.has_image):
-        #     self.prev_light_loc = None
-        #     return False
+            # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")  # original line
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")  # probable
 
-        # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+            # Get classification
+            return self.light_classifier.get_classification(cv_image)
+        else:
+            return light.state
 
-        # #Get classification
-        # return self.light_classifier.get_classification(cv_image)
+        
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
