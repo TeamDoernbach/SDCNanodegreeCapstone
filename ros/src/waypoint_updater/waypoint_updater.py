@@ -43,7 +43,7 @@ class WaypointUpdater(object):
 
         # Get vehicle parameters from rospy server. Fallback to -5m/s^2, in case value is missing
         self.decel_limit = rospy.get_param('~decel_limit',-5)
-        self.decel_slowdown = 0.5    # m/s^2 expected with throttle released
+        self.decel_slowdown = 0.2    # m/s^2 expected with throttle released
 
         # TODO: Add other member variables you need below
         self.pose = None
@@ -60,6 +60,7 @@ class WaypointUpdater(object):
         self.brake_dist = None
         self.slowdown_dist = None
         self.distances = []
+        self.slowing_down = False
 
         self.loop()
 
@@ -80,6 +81,7 @@ class WaypointUpdater(object):
 
                 # Set farthest waypoint. No wrap-around necessary here! This is done in next func
                 farthest_waypoint_idx = closest_waypoint_idx + LOOKAHEAD_WPS
+
                 # Publish waypoint
                 self.publish_waypoints(closest_waypoint_idx, farthest_waypoint_idx)
             rate.sleep()
@@ -145,11 +147,22 @@ class WaypointUpdater(object):
             for j, wp in enumerate(horizon_waypoints):
                 horizon_waypoints[j].twist.twist.linear.x = self.velocity
             lane.waypoints = horizon_waypoints
+            # Reset status bit for "slowing down"
+            self.slowing_down = False
         else:
-            # Check where latest slowdown points are
-            self.calc_slowdown_WPs()
+            # Check once where slowdown/brake points are located
+            if self.slowing_down == False:
+                self.calc_slowdown_WPs()
             # Update speed values of horizon waypoints
             lane.waypoints = self.decelerate_waypoints(horizon_waypoints, closest_idx, farthest_idx)
+
+        # Debug output
+        if all(value is not None for value in [self.WP_idx_ego, self.WP_idx_slowdown,
+            self.WP_idx_brake, self.velocity, lane.waypoints[0].twist.twist.linear.x]):
+            str_out = 'EgoIDX=%i,SlwIDX=%i,BrkIDX=%i. v_CC=%4.1f,v_set=%4.1f' % ( \
+                self.WP_idx_ego,self.WP_idx_slowdown,self.WP_idx_brake, \
+                self.velocity,lane.waypoints[0].twist.twist.linear.x)
+            rospy.logwarn(str_out)
 
         # Publish final lane waypoints to ROS
         self.final_waypoints_pub.publish(lane)
@@ -162,6 +175,7 @@ class WaypointUpdater(object):
         WPs_temp = []
         stop_idx = self.WP_idx_traffic_light    # Index of traffic light
         brake_dist = self.brake_dist            # Distance necessary to stop in time
+        slowdown_dist = self.slowdown_dist      # Distance for comfortably slowing down
         base_vel = self.velocity                # Target velocity, if undisturbed
 
         # Walk through horizon waypoints and adjust speed values
@@ -172,17 +186,22 @@ class WaypointUpdater(object):
             # Calculate distance of each horizon waypoint to stop line
             dist = self.distances[stop_idx] - self.distances[i+closest_idx]
             # Adjust speed, if waypoint is within distance necessary to stop in time
-            if dist < brake_dist:
+            #if dist < brake_dist:
+            if dist < slowdown_dist:
                 # New target velocity value, dependent on
                 #   - target speed (e.g. cruise control set speed)
                 #   - distance foreseen for decelerating
                 #   - current distance of waypoint to traffic light stop line
-                vel = 0.5 * self.velocity * (1 - np.cos(np.pi/brake_dist * dist))
+                #vel = 0.5 * self.velocity * (1 - np.cos(np.pi/brake_dist * dist))
+                vel = 0.5 * self.velocity * (1 - np.cos(np.pi/slowdown_dist * dist))
                 # Pull velocity down to zero if it becomes very small
                 if vel < 1.:
                     vel = 0.
                 # Use smaller value of either current velocity or new target velocity
                 p.twist.twist.linear.x = min(vel, self.velocity_curr)
+                # Update slow down status bit to true
+                self.slowing_down = True
+
             # Add current waypoint to array
             WPs_temp.append(p)
         # Return updated horizon waypoints
@@ -211,6 +230,12 @@ class WaypointUpdater(object):
         # Calculate waypoint idx, where gentle slowdown should start
         WP_dist_slowdown = self.distances[self.WP_idx_traffic_light] - self.slowdown_dist
         self.WP_idx_slowdown = bisect_left(self.distances, WP_dist_slowdown)
+        # Check if vehicle is already within slow down area
+        if self.WP_idx_ego > self.WP_idx_slowdown:
+            # Update start of slowdown and distance with current position
+            self.WP_idx_slowdown = self.WP_idx_ego
+            self.slowdown_dist = self.ego_dist
+
         # Return to calling function
         pass
 
