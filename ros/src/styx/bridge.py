@@ -35,7 +35,7 @@ TYPE = {
     'image':Image
 }
 
-VELOCITY_LIMITER = 0.2 # Default: 0.44704
+VELOCITY_LIMITER = 0.44704 # Default: 0.44704
 
 class Bridge(object):
     def __init__(self, conf, server):

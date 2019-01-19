@@ -94,16 +94,6 @@ class TLDetector(object):
         of times till we start using it. Otherwise the previous stable state is
         used.
         '''
-
-#        if (self.state == TrafficLight.RED):
-#            if ((state == TrafficLight.YELLOW) or (state == TrafficLight.GREEN)):
-#
-#
-#        elif (self.state == TrafficLight.YELLOW):
-#            asdf
-#        elif (self.state == TrafficLight.GREEN):
-#            asdf
-
         # Update traffic light status attributes
         if state != self.curr_state:
             # Detected traffic light color differs from known state
@@ -145,22 +135,9 @@ class TLDetector(object):
         else:
             # For sake of simplicity, is treated in same way as green
             self.last_wp = -1
+            
         # Detection done, publish message
         self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-
-#        # OLD CODE    #
-#        elif self.state_count >= STATE_COUNT_THRESHOLD:
-#            # Threshold exceeded, high certainty in detection
-#            # Check previous state
-#            if (state != TrafficLight.RED) and (state != TrafficLight.YELLOW):
-#                light_wp = -1
-#
-#            self.last_state = self.state
-#            self.last_wp = light_wp
-#            self.upcoming_red_light_pub.publish(Int32(light_wp))
-#        else:
-#            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-#        self.state_count += 1
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
