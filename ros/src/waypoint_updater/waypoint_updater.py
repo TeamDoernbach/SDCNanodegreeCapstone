@@ -190,9 +190,9 @@ class WaypointUpdater(object):
 
         # Walk through horizon waypoints and adjust speed values
         for i, wp in enumerate(waypoints):
-            p = Waypoint()
-            p.pose = wp.pose
-            p.twist = wp.twist
+            # p = Waypoint()
+            # p.pose = wp.pose
+            # p.twist = wp.twist
             # Calculate distance of each horizon waypoint to stop line
             dist = self.distances[stop_idx] - self.distances[i+closest_idx]
             # Adjust speed, if waypoint is within distance necessary to stop in time
@@ -203,21 +203,26 @@ class WaypointUpdater(object):
             #   - current distance of waypoint to traffic light stop line
             vel_Brk = vel_SD = base_vel
             if dist < brake_dist:
-                vel_Brk = 0.5 * self.velocity * (1 - np.cos(np.pi/brake_dist * dist))
+                vel_Brk = 0.5 * self.velocity * (1.00 - 1.00*np.cos(np.pi/brake_dist * dist))
             if dist < slowdown_dist:
-                vel_SD = 0.5 * self.velocity * (1.35 - 0.65*np.cos(np.pi/slowdown_dist * dist))
+                vel_SD =  0.5 * self.velocity * (1.45 - 0.55*np.cos(np.pi/slowdown_dist * dist))
                 # Use smaller value of either current velocity or new target velocity
-                vel = min(vel_Brk, vel_SD, self.velocity_curr)
+                vel = min(vel_Brk, vel_SD) #, self.velocity_curr)
                 # Pull velocity down to zero if it becomes very small
-                if vel < 0.25:
+                if vel < 0.70:
+                    vel = 0.
+                # If point is behind stop line
+                if dist < 0:
                     vel = 0.
                 # Update velocity value of waypoint
-                p.twist.twist.linear.x = vel
+                wp.twist.twist.linear.x = vel
                 # Update slow down status bit to true
                 self.slowing_down = True
 
             # Add current waypoint to array
-            WPs_temp.append(p)
+            WPs_temp.append(wp)
+            if i == 0 or i == 39:
+                rospy.loginfo(' Horizon WP %02i: dist=%6.1f, v_targ=%4.1f' % (i,dist,wp.twist.twist.linear.x))
         # Return updated horizon waypoints
         return WPs_temp
 
