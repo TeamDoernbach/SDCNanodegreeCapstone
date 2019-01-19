@@ -1,5 +1,6 @@
 import rospy
 import tensorflow as tf
+import numpy as np
 from PIL import ImageDraw
 from styx_msgs.msg import TrafficLight
 
@@ -55,26 +56,32 @@ class TLClassifier(object):
         # convert image to numpy array of uint8 and add an axis to the shape
         image = np.expand_dims(np.asarray(image, dtype=np.uint8), 0)
         # evaluate the tensors for boxes, scores and classes
-        boxes, scores, classes = sess.run([boxes_tensor, scores_tensor, classes_tensor],
-                                           feed_dict={image_tensor: image})
+        boxes, scores, classes = self.tfsess.run(
+            [self.boxes_tensor, self.scores_tensor, self.classes_tensor], 
+            feed_dict={self.input_tensor: image})
+
         boxes = np.squeeze(boxes)
         scores = np.squeeze(scores)
         classes = np.squeeze(classes)
 
         boxes, scores, classes = self.filter_boxes(boxes, scores, classes)
 
-        # decode class ID
-        class_id = classes[0]-1
-        if class_id == 0:
-            return TrafficLight.RED
-        elif class_id == 1:
-            return TrafficLight.YELLOW
-        elif class_id == 2:
-            return TrafficLight.GREEN
+        
+        if classes:  # if some traffic lights were detected
+            # decode class ID
+            class_id = classes[0]-1
+            if class_id == 0:
+                return TrafficLight.RED
+            elif class_id == 1:
+                return TrafficLight.YELLOW
+            elif class_id == 2:
+                return TrafficLight.GREEN
+            else:
+                return TrafficLight.UNKNOWN
         else:
             return TrafficLight.UNKNOWN
 
-    def filter_boxes(boxes, scores, classes):
+    def filter_boxes(self, boxes, scores, classes):
         """Return boxes with a confidence >= `min_score`"""
         n = len(classes)
         idxs = []

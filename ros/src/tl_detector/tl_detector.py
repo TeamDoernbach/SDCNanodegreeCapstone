@@ -14,7 +14,7 @@ import yaml
 import os
 
 STATE_COUNT_THRESHOLD = 3
-USE_TL_CLASSIFIER = False
+USE_TL_CLASSIFIER = True
 GRAPH_PATH = os.path.join('..', '..', '..', 'tl_detection', 'frozen_inference_graph.pb')
 
 class TLDetector(object):
@@ -238,6 +238,7 @@ class TLDetector(object):
 
         if closest_light:
             state = self.get_light_state(light)
+            rospy.loginfo('TL STATE = {:d}'.format(state))
             return line_wp_idx, state
         # self.waypoints = None
         return -1, TrafficLight.UNKNOWN
