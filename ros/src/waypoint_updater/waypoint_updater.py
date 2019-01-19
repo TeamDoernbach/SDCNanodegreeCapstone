@@ -43,7 +43,7 @@ class WaypointUpdater(object):
 
         # Get vehicle parameters from rospy server. Fallback to -5m/s^2, in case value is missing
         self.decel_limit = rospy.get_param('~decel_limit',-5)
-        self.decel_slowdown = 0.2    # m/s^2 expected with throttle released
+        self.decel_slowdown = -1.0    # m/s^2 slowdown deceleration rate
 
         # TODO: Add other member variables you need below
         self.pose = None
@@ -53,6 +53,7 @@ class WaypointUpdater(object):
         self.waypoints_2d = None
         self.waypoint_tree = None
         self.WP_idx_traffic_light = -1
+        self.WP_idx_stop = -1
         self.WP_idx_ego = None
         self.WP_idx_brake = None
         self.WP_idx_slowdown = None
@@ -141,7 +142,8 @@ class WaypointUpdater(object):
             horizon_waypoints = np.take(self.base_waypoints.waypoints,indices,mode='wrap')
 
         # Check if traffic light signal and proximity to stop line require deceleration
-        if ((self.WP_idx_traffic_light == -1) or (self.WP_idx_traffic_light > farthest_idx)):
+        if ((self.slowing_down == True) and \
+            ((self.WP_idx_traffic_light == -1) or (self.WP_idx_traffic_light > self.WP_idx_stop))):
             # Reset speed to target velocity if TL ahead is not yellow/red or too far away
             # This step was necessary to get the car moving again after TL turns green
             for j, wp in enumerate(horizon_waypoints):
@@ -159,9 +161,9 @@ class WaypointUpdater(object):
         # Debug output
         if all(value is not None for value in [self.WP_idx_ego, self.WP_idx_slowdown,
             self.WP_idx_brake, self.velocity, lane.waypoints[0].twist.twist.linear.x]):
-            str_out = 'EgoIDX=%i,SlwIDX=%i,BrkIDX=%i. v_CC=%4.1f,v_set=%4.1f' % ( \
+            str_out = 'EgoIDX=%i,SlwIDX=%i,BrkIDX=%i. v_CC=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
                 self.WP_idx_ego,self.WP_idx_slowdown,self.WP_idx_brake, \
-                self.velocity,lane.waypoints[0].twist.twist.linear.x)
+                self.velocity,lane.waypoints[0].twist.twist.linear.x,self.slowing_down)
             rospy.logwarn(str_out)
 
         # Publish final lane waypoints to ROS
@@ -213,6 +215,8 @@ class WaypointUpdater(object):
         """
         WP_ego = self.WP_idx_ego
         WP_stop = self.WP_idx_traffic_light
+        # Store stop position in variable that is not overriden by traffic light message
+        self.WP_idx_stop = WP_stop
 
         # Calculate distance between ego and stop line
         self.ego_dist = self.distances[self.WP_idx_traffic_light] - self.distances[self.WP_idx_ego]
