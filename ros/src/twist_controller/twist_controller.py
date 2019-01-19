@@ -31,13 +31,20 @@ class Controller(object):
                                             max_steer_angle)
 
         # Speed throttle controller
-        kp = 0.8  # Proportional term
-        ki = 0.4  # Integral term
-        kd = 1.0  # Differential term
-        mn = 0.0  # Min throttle value
-        mx = self.accel_limit * ACCELERATION_HYPERPARAMETER  # Max throttle value
-        self.throttle_controller = PID(kp, ki, kd, mn, mx)
-        self.distance_to_accel_limit = 0.0
+        throttle_kp = 0.8  # Proportional term
+        throttle_ki = 0.4  # Integral term
+        throttle_kd = 1.0  # Differential term
+        throttle_mn = 0.0  # Min throttle value
+        throttle_mx = self.accel_limit * ACCELERATION_HYPERPARAMETER  # Max throttle value
+        self.throttle_controller = PID(throttle_kp, throttle_ki, throttle_kd, throttle_mn, throttle_mx)
+
+        # Steering controller
+        steer_kp = 0.1  # Proportional term
+        steer_ki = 0.4  # Integral term
+        steer_kd = 1.0  # Differential term
+        steer_mn = 0.0  # Min throttle value
+        steer_mx = self.accel_limit * ACCELERATION_HYPERPARAMETER  # Max throttle value
+        self.steering_controller = PID(steer_kp, steer_ki, steer_kd, steer_mn, steer_mx)
 
         # Define low-pass filter settings
         tau = 0.5  # 1/(2pi*tau) = cutoff frequency
@@ -70,6 +77,7 @@ class Controller(object):
         steering = self.yaw_controller.get_steering(linear_vel,
                                                     angular_vel,
                                                     current_vel)
+                                                    
 
         vel_error = linear_vel - current_vel
         self.last_vel = current_vel
@@ -79,6 +87,7 @@ class Controller(object):
         self.last_time = current_time
 
         throttle = self.throttle_controller.step(vel_error, sample_time)
+        steering = self.steering_controller.step(steering, sample_time)
 
         brake = 0.
 
@@ -93,9 +102,9 @@ class Controller(object):
         elif vel_error >= abs(3.0) and steering > abs(0.2):
             throttle -= throttle * abs(self.decel_limit)
 
-        #rospy.logwarn("Throttle:   {0}".format(throttle))
+        rospy.logwarn("Throttle:   {0}".format(throttle))
         #rospy.logwarn("Brake:    {0}".format(brake))
-        #rospy.logwarn("Steering:    {0}".format(steering))
-        #rospy.logwarn("Velocity error: {0}".format(vel_error))
+        rospy.logwarn("Steering:    {0}".format(steering))
+        rospy.logwarn("Velocity error: {0}".format(vel_error))
 
         return throttle, brake, steering
