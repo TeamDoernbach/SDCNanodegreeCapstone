@@ -3,11 +3,12 @@
 import rospy
 from std_msgs.msg import Bool
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import TwistStamped, Pose, PoseStamped
 import math
 import time
 
 from twist_controller import Controller
+from styx_msgs.msg import Waypoint, Lane
 
 '''
 You can build this node only after you have built (or partially built) the `waypoint_updater` node.
@@ -52,23 +53,20 @@ class DBWNode(object):
         max_lat_accel   = rospy.get_param('~max_lat_accel',     3.)
         max_steer_angle = rospy.get_param('~max_steer_angle',   8.)
 
+        # Publish all topics to simulator (output)
+        self.steer_pub = rospy.Publisher('/vehicle/steering_cmd', SteeringCmd, queue_size=1)
+        self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd', ThrottleCmd, queue_size=1)
+        self.brake_pub = rospy.Publisher('/vehicle/brake_cmd', BrakeCmd, queue_size=1)
+
         # Subscribe all topics that related for DBW system (input)
         # /current_velocity and /twist_cmd topics are necessary to calculate the steering command
-        rospy.Subscriber('/vehicle/dbw_enabled', 
-                        Bool,           self.dbw_enabled_cb) # source: simulator
-        rospy.Subscriber('/current_velocity', 
-                        TwistStamped,   self.velocity_cb)    # source: simulator
-        rospy.Subscriber('/twist_cmd', 
-                        TwistStamped,   self.twist_cb)       # source: WP follower
-
-
-        # Publish all topics to simulator (output)
-        self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
-                                        SteeringCmd,    queue_size=1)
-        self.throttle_pub = rospy.Publisher('/vehicle/throttle_cmd',
-                                        ThrottleCmd,    queue_size=1)
-        self.brake_pub = rospy.Publisher('/vehicle/brake_cmd',
-                                        BrakeCmd,       queue_size=1)
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb, queue_size=1) # source: simulator
+        rospy.Subscriber('/current_velocity', TwistStamped, self.velocity_cb, queue_size=1) # source: simulator
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb, queue_size=1) # source: WP follower
+        rospy.Subscriber('/current_pose', PoseStamped, self.current_pose_cb, queue_size=1)
+        rospy.Subscriber('/final_waypoints', Lane, self.final_waypoints_cb, queue_size=1)
+        self.prev_action = '' # Decision Making
+        self.current_pose = None
 
         # Create `Controller` object
         # TODO: Clean up, since all inputs from Q&A video were blindly added for initial version,
@@ -91,9 +89,21 @@ class DBWNode(object):
         self.linear_vel = None
         self.angular_vel = None
 
-        # initialize timer
-        self.prev_time = time.time()
-        self.one_second_elapsed = False
+        # just not to lose overview - can be changed
+        control_init_params = {
+            'fuel_capacity': fuel_capacity,
+            'brake_deadband': brake_deadband,
+            'accel_limit': accel_limit,
+            'vehicle_mass': vehicle_mass,
+            'wheel_radius': wheel_radius,
+            'decel_limit': decel_limit,
+            'wheel_base': wheel_base,
+            'steer_ratio': steer_ratio,
+            'max_lat_accel': max_lat_accel,
+            'max_steer_angle': max_steer_angle
+        }
+
+        self.controller = Controller(**control_init_params)
 
         # Initialize vehicle actuator commands to zero
         self.throttle = self.steering = self.brake = 0
@@ -111,20 +121,21 @@ class DBWNode(object):
 
         while not rospy.is_shutdown():
             # Get predicted throttle, brake, and steering using `twist_controller`
-            if not None in (self.current_vel, self.linear_vel, self.angular_vel):
-                self.throttle, self.brake, self.steering = self.controller.control(self.current_vel,
-                                                                                   self.dbw_enabled,
-                                                                                   self.linear_vel,
-                                                                                   self.angular_vel,
-                                                                                   self.one_second_elapsed)
+            if(self.dbw_enabled) and \
+              (self.current_pose is not None) and \
+              (self.current_vel is not None):
+                calc_params = {
+                    'linear': self.linear_vel.twist.linear.x,
+                    'angular': self.angular_vel.twist.angular.z,
+                    'current': self.current_vel.twist.linear.x
+                }
+                throttle, brake, steering = self.controller.control(**calc_params)
 
-            # Reset the flag after it flags as True
-            if self.one_second_elapsed == True:
-                self.one_second_elapsed = False
-            self.countPerSecond()
-            # Publish commands only, if DBW is enable (i.e. if not in manual mode)
-            if self.dbw_enabled:
-                self.publish(self.throttle, self.brake, self.steering)
+                self.publish(throttle, brake, steering)
+
+            else:
+                # Manual mode
+                self.controller.throttle_controller.reset()
 
 
             # Sleep until next cycle
@@ -135,22 +146,28 @@ class DBWNode(object):
         Is DBW enabled: Directly use boolean message from ROS topic "/vehicle/dbw_enabled"
         Signal source: "simulator node"
         """
-        self.dbw_enabled = msg
+        self.dbw_enabled = msg.data
 
     def velocity_cb(self, msg):
         """
         Current longitudinal velocity: Extract from ROS topic "/current_velocity"
         Signal source: "simulator node"
         """
-        self.current_vel = msg.twist.linear.x
+        self.current_vel = msg
 
     def twist_cb(self, msg):
         """
         Current longitudinal and angular velocity: Extract from "/twist_cmd"
         Signal source: "waypoint follower node"
         """
-        self.linear_vel = msg.twist.linear.x
-        self.angular_vel = msg.twist.angular.z
+        self.linear_vel = msg
+        self.angular_vel = msg
+
+    def current_pose_cb(self, msg):
+        self.current_pose = msg
+
+    def final_waypoints_cb(self, msg):
+        self.final_waypoints = msg
 
     def publish(self, throttle, brake, steer):
         """
@@ -160,32 +177,31 @@ class DBWNode(object):
         tcmd.enable = True
         tcmd.pedal_cmd_type = ThrottleCmd.CMD_PERCENT
         tcmd.pedal_cmd = throttle
-        self.throttle_pub.publish(tcmd)
 
         scmd = SteeringCmd()
         scmd.enable = True
         scmd.steering_wheel_angle_cmd = steer
-        self.steer_pub.publish(scmd)
 
         bcmd = BrakeCmd()
         bcmd.enable = True
         bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
         bcmd.pedal_cmd = brake
-        self.brake_pub.publish(bcmd)
 
-    def countPerSecond(self):
-        start = time.time()
+        action = 'brake' if brake > 0.0 else 'throttle'
 
-        # To get the more precision time record
-        time.clock()
+        if action != self.prev_action:
+            self.brake_pub.publish(bcmd)
+            self.throttle_pub.publish(tcmd)
 
-        #rospy.logwarn("Start: {}".format(start))
-        #rospy.logwarn("Prev: {}".format(self.prev_time))
-        #rospy.logwarn("Diff: {}".format(round(start - self.prev_time, 1)))
+        elif action == 'brake':
+            self.brake_pub.publish(bcmd)
 
-        if round(start - self.prev_time, 1) == float(1.0):
-            self.prev_time = start
-            self.one_second_elapsed = True
+        elif action == 'throttle':
+            self.throttle_pub.publish(tcmd)
+
+        self.steer_pub.publish(scmd)
+
+        self.prev_action = action
 
 if __name__ == '__main__':
     DBWNode()
