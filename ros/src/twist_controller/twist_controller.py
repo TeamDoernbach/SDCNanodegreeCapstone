@@ -39,12 +39,10 @@ class Controller(object):
         self.throttle_controller = PID(throttle_kp, throttle_ki, throttle_kd, throttle_mn, throttle_mx)
 
         # Steering controller
-        steer_kp = 0.1  # Proportional term
-        steer_ki = 0.4  # Integral term
-        steer_kd = 1.0  # Differential term
-        steer_mn = 0.0  # Min throttle value
-        steer_mx = self.accel_limit * ACCELERATION_HYPERPARAMETER  # Max throttle value
-        self.steering_controller = PID(steer_kp, steer_ki, steer_kd, steer_mn, steer_mx)
+        steer_kp = 1.0  # Proportional term
+        steer_ki = 0.01  # Integral term
+        steer_kd = 0.1  # Differential term
+        self.steering_controller = PID(steer_kp, steer_ki, steer_kd, -max_steer_angle, max_steer_angle)
 
         # Define low-pass filter settings
         tau = 0.5  # 1/(2pi*tau) = cutoff frequency
@@ -74,11 +72,6 @@ class Controller(object):
         #rospy.logwarn("Current velocity:   {0}".format(current_vel))
         #rospy.logwarn("Filtered velocity:  {0}".format(self.vel_lpf.get()))
 
-        steering = self.yaw_controller.get_steering(linear_vel,
-                                                    angular_vel,
-                                                    current_vel)
-                                                    
-
         vel_error = linear_vel - current_vel
         self.last_vel = current_vel
 
@@ -87,6 +80,9 @@ class Controller(object):
         self.last_time = current_time
 
         throttle = self.throttle_controller.step(vel_error, sample_time)
+
+        steering = self.yaw_controller.get_steering(linear_vel, angular_vel, current_vel)
+        #steering = self.vel_lpf.filt(steering)
         steering = self.steering_controller.step(steering, sample_time)
 
         brake = 0.
