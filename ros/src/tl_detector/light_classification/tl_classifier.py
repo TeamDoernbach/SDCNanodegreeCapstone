@@ -2,6 +2,7 @@ import rospy
 import tensorflow as tf
 import numpy as np
 from PIL import ImageDraw
+from PIL import Image
 from styx_msgs.msg import TrafficLight
 
 """
@@ -40,7 +41,7 @@ class TLClassifier(object):
         self.COLOR_LIST = ['red', 'yellow', 'green']
         
 
-    def get_classification(self, image):
+    def get_classification(self, image, debug=False):
         """Determines the color of the traffic light in the image
 
         Args:
@@ -54,11 +55,11 @@ class TLClassifier(object):
 
         # with tf.Session(graph=self.tfgraph) as sess:
         # convert image to numpy array of uint8 and add an axis to the shape
-        image = np.expand_dims(np.asarray(image, dtype=np.uint8), 0)
+        image_np = np.expand_dims(np.asarray(image, dtype=np.uint8), 0)
         # evaluate the tensors for boxes, scores and classes
         boxes, scores, classes = self.tfsess.run(
             [self.boxes_tensor, self.scores_tensor, self.classes_tensor], 
-            feed_dict={self.input_tensor: image})
+            feed_dict={self.input_tensor: image_np})
 
         boxes = np.squeeze(boxes)
         scores = np.squeeze(scores)
@@ -67,19 +68,29 @@ class TLClassifier(object):
         boxes, scores, classes = self.filter_boxes(boxes, scores, classes)
 
         
-        if classes:  # if some traffic lights were detected
-            # decode class ID
-            class_id = classes[0]-1
-            if class_id == 0:
-                return TrafficLight.RED
-            elif class_id == 1:
-                return TrafficLight.YELLOW
-            elif class_id == 2:
-                return TrafficLight.GREEN
+        if debug:
+            image = Image.fromarray(image)
+            width, height = image.size
+            # rospy.loginfo('Image size: {}'.format(image_np.shape))
+            box_coords = self.to_image_coords(boxes, height, width)
+            self.draw_boxes(image, box_coords, classes)
+            return np.array(image)
+
+        else:
+            if classes:  # if some traffic lights were detected
+                # decode class ID
+                class_id = classes[0]-1
+                if class_id == 0:
+                    return TrafficLight.RED
+                elif class_id == 1:
+                    return TrafficLight.YELLOW
+                elif class_id == 2:
+                    return TrafficLight.GREEN
+                else:
+                    return TrafficLight.UNKNOWN
             else:
                 return TrafficLight.UNKNOWN
-        else:
-            return TrafficLight.UNKNOWN
+
 
     def filter_boxes(self, boxes, scores, classes):
         """Return boxes with a confidence >= `min_score`"""
@@ -107,13 +118,12 @@ class TLClassifier(object):
         
         return box_coords
 
-    @staticmethod
-    def draw_boxes(image, boxes, classes, thickness=4):
+    def draw_boxes(self, image, boxes, classes, thickness=4):
         """Draw bounding boxes on the image"""
         draw = ImageDraw.Draw(image)
         for i in range(len(boxes)):
             bot, left, top, right = boxes[i, ...]
-            color = COLOR_LIST[int(classes[i]) - 1]
+            color = self.COLOR_LIST[int(classes[i]) - 1]
             draw.line([(left, top), (left, bot), (right, bot), (right, top), (left, top)], 
                       width=thickness, fill=color)
     
