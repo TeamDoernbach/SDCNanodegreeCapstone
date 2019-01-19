@@ -43,7 +43,7 @@ class WaypointUpdater(object):
 
         # Get vehicle parameters from rospy server. Fallback to -5m/s^2, in case value is missing
         self.decel_limit = rospy.get_param('~decel_limit',-5)
-        self.decel_slowdown = -1.5    # m/s^2 slowdown deceleration rate
+        self.decel_slowdown = -0.8    # m/s^2 slowdown deceleration rate
 
         # TODO: Add other member variables you need below
         self.pose = None
@@ -161,8 +161,8 @@ class WaypointUpdater(object):
         # Debug output
         if all(value is not None for value in [self.WP_idx_ego, self.WP_idx_slowdown,
             self.WP_idx_brake, self.velocity, lane.waypoints[0].twist.twist.linear.x]):
-            str_out = 'EgoIDX=%i,SlwIDX=%i,BrkIDX=%i. v_CC=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
-                self.WP_idx_ego,self.WP_idx_slowdown,self.WP_idx_brake, \
+            str_out = 'EgoIDX=%i,SlwIDX=%i,BrkIDX=%i,StpIDX=%i. v_CC=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
+                self.WP_idx_ego,self.WP_idx_slowdown,self.WP_idx_brake,self.WP_idx_traffic_light, \
                 self.velocity,lane.waypoints[0].twist.twist.linear.x,self.slowing_down)
             rospy.logwarn(str_out)
 
@@ -188,19 +188,23 @@ class WaypointUpdater(object):
             # Calculate distance of each horizon waypoint to stop line
             dist = self.distances[stop_idx] - self.distances[i+closest_idx]
             # Adjust speed, if waypoint is within distance necessary to stop in time
-            #if dist < brake_dist:
+
+            # New target velocity value, dependent on
+            #   - target speed (e.g. cruise control set speed)
+            #   - distance foreseen for decelerating
+            #   - current distance of waypoint to traffic light stop line
+            vel_Brk = vel_SD = base_vel
+            if dist < brake_dist:
+                vel_Brk = 0.5 * self.velocity_curr * (1 - np.cos(np.pi/brake_dist * dist))
             if dist < slowdown_dist:
-                # New target velocity value, dependent on
-                #   - target speed (e.g. cruise control set speed)
-                #   - distance foreseen for decelerating
-                #   - current distance of waypoint to traffic light stop line
-                #vel = 0.5 * self.velocity * (1 - np.cos(np.pi/brake_dist * dist))
-                vel = 0.5 * self.velocity * (1 - np.cos(np.pi/slowdown_dist * dist))
-                # Pull velocity down to zero if it becomes very small
-                if vel < 1.:
-                    vel = 0.
+                vel_SD = 0.5 * self.velocity * (1.35 - 0.65*np.cos(np.pi/slowdown_dist * dist))
                 # Use smaller value of either current velocity or new target velocity
-                p.twist.twist.linear.x = min(vel, self.velocity_curr)
+                vel = min(vel_Brk, vel_SD, self.velocity_curr)
+                # Pull velocity down to zero if it becomes very small
+                if vel < 0.5:
+                    vel = 0.
+                # Update velocity value of waypoint
+                p.twist.twist.linear.x = vel
                 # Update slow down status bit to true
                 self.slowing_down = True
 
