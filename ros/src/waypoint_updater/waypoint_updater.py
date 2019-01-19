@@ -43,7 +43,7 @@ class WaypointUpdater(object):
 
         # Get vehicle parameters from rospy server. Fallback to -5m/s^2, in case value is missing
         self.decel_limit = rospy.get_param('~decel_limit',-5)
-        self.decel_slowdown = -0.8    # m/s^2 slowdown deceleration rate
+        self.decel_slowdown = -1.0    # m/s^2 slowdown deceleration rate
 
         # TODO: Add other member variables you need below
         self.pose = None
@@ -158,12 +158,20 @@ class WaypointUpdater(object):
             # Update speed values of horizon waypoints
             lane.waypoints = self.decelerate_waypoints(horizon_waypoints, closest_idx, farthest_idx)
 
+        # Update ego distance
+        self.ego_dist = self.distances[self.WP_idx_traffic_light] - self.distances[self.WP_idx_ego]
+
         # Debug output
         if all(value is not None for value in [self.WP_idx_ego, self.WP_idx_slowdown,
-            self.WP_idx_brake, self.velocity, lane.waypoints[0].twist.twist.linear.x]):
-            str_out = 'EgoIDX=%i,SlwIDX=%i,BrkIDX=%i,StpIDX=%i. v_CC=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
+            self.WP_idx_brake, self.velocity, lane.waypoints[0].twist.twist.linear.x,
+            self.ego_dist, self.brake_dist, self.slowdown_dist]):
+            str_out = 'EgoIDX=%i,SlwIDX=%i,BrkIDX=%i,StpIDX=%i. v_CC=%4.1f,v_cur=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
                 self.WP_idx_ego,self.WP_idx_slowdown,self.WP_idx_brake,self.WP_idx_traffic_light, \
-                self.velocity,lane.waypoints[0].twist.twist.linear.x,self.slowing_down)
+                self.velocity,self.velocity_curr,lane.waypoints[0].twist.twist.linear.x,self.slowing_down)
+            rospy.logwarn(str_out)
+            str_out = 'EgoDist=%4.1f,SlwDist=%4.1f,BrkDist=%4.1f. v_CC=%4.1f,v_cur=%4.1f,v_set=%4.1f,SlowDown=%r' % ( \
+                self.ego_dist,self.slowdown_dist,self.brake_dist, \
+                self.velocity,self.velocity_curr,lane.waypoints[0].twist.twist.linear.x,self.slowing_down)
             rospy.logwarn(str_out)
 
         # Publish final lane waypoints to ROS
@@ -195,13 +203,13 @@ class WaypointUpdater(object):
             #   - current distance of waypoint to traffic light stop line
             vel_Brk = vel_SD = base_vel
             if dist < brake_dist:
-                vel_Brk = 0.5 * self.velocity_curr * (1 - np.cos(np.pi/brake_dist * dist))
+                vel_Brk = 0.5 * self.velocity * (1 - np.cos(np.pi/brake_dist * dist))
             if dist < slowdown_dist:
                 vel_SD = 0.5 * self.velocity * (1.35 - 0.65*np.cos(np.pi/slowdown_dist * dist))
                 # Use smaller value of either current velocity or new target velocity
                 vel = min(vel_Brk, vel_SD, self.velocity_curr)
                 # Pull velocity down to zero if it becomes very small
-                if vel < 0.5:
+                if vel < 0.25:
                     vel = 0.
                 # Update velocity value of waypoint
                 p.twist.twist.linear.x = vel
