@@ -5,6 +5,7 @@ from std_msgs.msg import Bool
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 from geometry_msgs.msg import TwistStamped
 import math
+import time
 
 from twist_controller import Controller
 
@@ -82,12 +83,17 @@ class DBWNode(object):
                                     steer_ratio     = steer_ratio,
                                     max_lat_accel   = max_lat_accel,
                                     max_steer_angle = max_steer_angle)
+        
         # Initialize necessary variables
         self.current_vel = None
         self.curr_ang_vel = None
         self.dbw_enabled = None
         self.linear_vel = None
         self.angular_vel = None
+
+        # initialize timer
+        self.prev_time = time.time()
+        self.one_second_elapsed = False
 
         # Initialize vehicle actuator commands to zero
         self.throttle = self.steering = self.brake = 0
@@ -102,16 +108,24 @@ class DBWNode(object):
         messages are published at less than 10Hz.
         """
         rate = rospy.Rate(50) # 50Hz
+
         while not rospy.is_shutdown():
             # Get predicted throttle, brake, and steering using `twist_controller`
             if not None in (self.current_vel, self.linear_vel, self.angular_vel):
                 self.throttle, self.brake, self.steering = self.controller.control(self.current_vel,
                                                                                    self.dbw_enabled,
                                                                                    self.linear_vel,
-                                                                                   self.angular_vel)
+                                                                                   self.angular_vel,
+                                                                                   self.one_second_elapsed)
+
+            # Reset the flag after it flags as True
+            if self.one_second_elapsed == True:
+                self.one_second_elapsed = False
+            self.countPerSecond()
             # Publish commands only, if DBW is enable (i.e. if not in manual mode)
             if self.dbw_enabled:
                 self.publish(self.throttle, self.brake, self.steering)
+
 
             # Sleep until next cycle
             rate.sleep()
@@ -158,6 +172,20 @@ class DBWNode(object):
         bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
+
+    def countPerSecond(self):
+        start = time.time()
+
+        # To get the more precision time record
+        time.clock()
+
+        #rospy.logwarn("Start: {}".format(start))
+        #rospy.logwarn("Prev: {}".format(self.prev_time))
+        #rospy.logwarn("Diff: {}".format(round(start - self.prev_time, 1)))
+
+        if round(start - self.prev_time, 1) == float(1.0):
+            self.prev_time = start
+            self.one_second_elapsed = True
 
 if __name__ == '__main__':
     DBWNode()

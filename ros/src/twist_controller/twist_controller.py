@@ -5,6 +5,7 @@ import rospy
 
 GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
+ACCELERATION_HYPERPARAMETER = 0.8
 
 
 class Controller(object):
@@ -31,11 +32,12 @@ class Controller(object):
 
         # Speed throttle controller
         kp = 0.8  # Proportional term
-        ki = 0.1  # Integral term
-        kd = 0.1  # Differential term
+        ki = 0.4  # Integral term
+        kd = 1.0  # Differential term
         mn = 0.0  # Min throttle value
-        mx = 0.8  # Max throttle value
+        mx = self.accel_limit * ACCELERATION_HYPERPARAMETER  # Max throttle value
         self.throttle_controller = PID(kp, ki, kd, mn, mx)
+        self.distance_to_accel_limit = 0.0
 
         # Define low-pass filter settings
         tau = 0.5  # 1/(2pi*tau) = cutoff frequency
@@ -47,8 +49,7 @@ class Controller(object):
         # Get current time stamp during initialization
         self.last_time = rospy.get_time()
 
-
-    def control(self, current_vel, dbw_enabled, linear_vel, angular_vel):
+    def control(self, current_vel, dbw_enabled, linear_vel, angular_vel, one_second_elapsed):
         # TODO: Change the arg, kwarg list to suit your needs
         # Return throttle, brake, steer
 
@@ -88,29 +89,13 @@ class Controller(object):
             throttle = 0.
             decel = max(vel_error, self.decel_limit)
             brake = abs(decel)*self.vehicle_mass*self.wheel_radius    # Torque Nm
-
-        steering = self.stabilize_steering(steering, vel_error)
-        
-        #rospy.logwarn("Throttle:   {0}".format(throttle))
+        # Slow down the speed
+        elif vel_error >= abs(3.0) and steering > abs(0.2):
+            throttle -= throttle * abs(self.decel_limit)
+         
+        rospy.logwarn("Throttle:   {0}".format(throttle))
         #rospy.logwarn("Brake:    {0}".format(brake))
         #rospy.logwarn("Steering:    {0}".format(steering))
-        #rospy.logwarn("Velocity error: {0}".format(vel_error))
+        rospy.logwarn("Velocity error: {0}".format(vel_error))
 
         return throttle, brake, steering
-
-    def stabilize_steering(self, steering, vel_error):
-        """
-        Stabilize the steering angle
-        """
-        if vel_error <= abs(0.001):
-            if steering > 0:
-                return steering - abs(vel_error)
-            else:
-                return steering + abs(vel_error)
-        elif vel_error >= abs(1.0) and steering == 0.0:
-            return steering
-        else:
-            if steering > 0:
-                return steering + abs(vel_error)
-            else:
-                return steering - abs(vel_error)
