@@ -35,6 +35,7 @@ TYPE = {
     'image':Image
 }
 
+VELOCITY_LIMITER = 0.44704 # Default: 0.44704
 
 class Bridge(object):
     def __init__(self, conf, server):
@@ -44,6 +45,8 @@ class Bridge(object):
         self.yaw = None
         self.angular_vel = 0.
         self.bridge = CvBridge()
+        self.cam_nth_img_use = 4   # Every n-th image: definition of N
+        self.cam_nth_img_ctr = 1    # Every n-th image: initialization of counter variable
 
         self.callbacks = {
             '/vehicle/steering_cmd': self.callback_steering,
@@ -135,7 +138,7 @@ class Bridge(object):
         self.broadcast_transform("base_link", position, orientation)
 
         self.publishers['current_pose'].publish(pose)
-        self.vel = data['velocity']* 0.44704
+        self.vel = data['velocity'] * VELOCITY_LIMITER
         self.angular = self.calc_angular(data['yaw'] * math.pi/180.)
         self.publishers['current_velocity'].publish(self.create_twist(self.vel, self.angular))
 
@@ -175,12 +178,22 @@ class Bridge(object):
         self.publishers['dbw_status'].publish(Bool(data))
 
     def publish_camera(self, data):
-        imgString = data["image"]
-        image = PIL_Image.open(BytesIO(base64.b64decode(imgString)))
-        image_array = np.asarray(image)
-
-        image_message = self.bridge.cv2_to_imgmsg(image_array, encoding="rgb8")
-        self.publishers['image'].publish(image_message)
+        # Only process every nth image (simulator performance issues)
+        if (self.cam_nth_img_ctr != 0):
+            # Raise counter by 1
+            self.cam_nth_img_ctr = (self.cam_nth_img_ctr + 1) % self.cam_nth_img_use
+            # Exit function
+            return
+        else:
+            # Raise counter by 1
+            self.cam_nth_img_ctr = (self.cam_nth_img_ctr + 1) % self.cam_nth_img_use
+            # Prepare image
+            imgString = data["image"]
+            image = PIL_Image.open(BytesIO(base64.b64decode(imgString)))
+            image_array = np.asarray(image)
+            # Publish image to topic
+            image_message = self.bridge.cv2_to_imgmsg(image_array, encoding="rgb8")
+            self.publishers['image'].publish(image_message)
 
     def callback_steering(self, data):
         self.server('steer', data={'steering_angle': str(data.steering_wheel_angle_cmd)})
