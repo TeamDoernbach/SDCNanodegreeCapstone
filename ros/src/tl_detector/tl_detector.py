@@ -14,8 +14,9 @@ import yaml
 import os
 
 STATE_COUNT_THRESHOLD = 3
-USE_TL_CLASSIFIER = True
-GRAPH_PATH = os.path.join('..', '..', '..', 'tl_detection', 'frozen_inference_graph.pb')
+
+# Switch to force Traffic Light classifier. True = "ON", False = "Auto-Logic"
+FORCE_TL_CLASSIFIER = False
 
 class TLDetector(object):
     def __init__(self):
@@ -43,6 +44,19 @@ class TLDetector(object):
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
 
+        # Auto-enable traffic light detection: sim = OFF, lot = ON
+        if ((FORCE_TL_CLASSIFIER == True) or ("site_traffic_light_config.yaml" in config_string)):
+            self.USE_TL_CLASSIFIER = True
+            GRAPH_PATH = os.path.join('..', '..', '..', 'tl_detection', 'frozen_inference_graph.pb')
+
+            self.bridge = CvBridge()
+            self.light_classifier = TLClassifier(GRAPH_PATH)
+            self.listener = tf.TransformListener()
+        elif "sim_traffic_light_config.yaml" in config_string:
+            self.USE_TL_CLASSIFIER = False
+        else:
+            self.USE_TL_CLASSIFIER = False
+
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         # DEBUG topic
@@ -50,9 +64,6 @@ class TLDetector(object):
         self.tl_detection_image_pub = rospy.Publisher('/tl_detection_image', Image, queue_size=1)
 
 
-        self.bridge = CvBridge()
-        self.light_classifier = TLClassifier(GRAPH_PATH)
-        self.listener = tf.TransformListener()
 
         self.new_state = TrafficLight.UNKNOWN
         self.curr_state = TrafficLight.UNKNOWN
@@ -135,7 +146,7 @@ class TLDetector(object):
         else:
             # For sake of simplicity, is treated in same way as green
             self.last_wp = -1
-            
+
         # Detection done, publish message
         self.upcoming_red_light_pub.publish(Int32(self.last_wp))
 
@@ -173,7 +184,7 @@ class TLDetector(object):
 
         # the simulator tells us what state (Red/Yellow/Green) the TL is in.
         # in reality we're gonna need a classifier to tell the state from the camera image
-        if USE_TL_CLASSIFIER:
+        if self.USE_TL_CLASSIFIER:
             if(not self.has_image):
                 self.prev_light_loc = None
                 return False
@@ -186,7 +197,7 @@ class TLDetector(object):
         else:
             return light.state
 
-        
+
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
