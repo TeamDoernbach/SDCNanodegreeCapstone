@@ -101,9 +101,9 @@ class Controller(object):
                 if velocity > self.brake_deadband:
                     brake = velocity * self.brake_torque
 
-        rospy.logwarn("Throttle:   {0}".format(throttle))
-        #rospy.logwarn("Brake:    {0}".format(brake))
-        rospy.logwarn("Steering:    {0}".format(steering))
-        rospy.logwarn("Velocity error: {0}".format(vel_error))
+        # rospy.logwarn("Throttle:   {0}".format(throttle))
+        # rospy.logwarn("Brake:    {0}".format(brake))
+        # rospy.logwarn("Steering:    {0}".format(steering))
+        # rospy.logwarn("Velocity error: {0}".format(vel_error))
 
         return throttle, brake, steering
