@@ -22,7 +22,7 @@ The operating system used for this task is called ROS (Robot Operating System), 
 
 
 
-## ![](imgs\thorsten_even_smaller.png) Team Dörnbach
+## ![](imgs/thorsten_even_smaller.png) Team Dörnbach
 
 *Nobody can develop a self-driving car alone and so it was really a huge pleasure to spend theses last 10 months together in Slack with this awesome team and to develop this final of the overall 14 projects with it:*
 
