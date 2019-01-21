@@ -1,10 +1,10 @@
 ## Self-Driving Car Capstone Project - Team Dörnbach
 
-*"Self-Driving Car Engineer? Dat war doch schon immer dein alter Jugendtraum!"*
+*"Self-Driving Car Engineer Nanodegree? Dat war doch schon immer dein alter Jugendtraum!"*
 
 
 
-![](C:\Projects\CarND-Capstone\imgs\starting_at_green.gif)
+![](imgs/starting_at_green.gif)
 
 
 
@@ -12,9 +12,9 @@ This is the capstone project of [Udacity's Self-Driving Car Engineer Nanodegree]
 
 The operating system used for this task is called ROS (Robot Operating System), a very popular, modular system optimized for robotics which allows the synchronous and asynchronous communication between the single hard- and software components involved in this task such as the camera providing the image required for the traffic light detection, lidar or software services which for example provide already processed data in form of the current traffic light state or the next way points for the drive by wire system.
 
-![](C:\Projects\CarND-Capstone\imgs\CarlaVeh.jpg)
+![](imgs/CarlaVeh.jpg)
 
-![](C:\Projects\CarND-Capstone\imgs\sdc_partners.png)
+![](imgs/sdc_partners.png)
 
 
 
@@ -22,7 +22,7 @@ The operating system used for this task is called ROS (Robot Operating System), 
 
 
 
-## ![](C:\Projects\CarND-Capstone\imgs\thorsten_even_smaller.png) Team Dörnbach
+## ![](imgs\thorsten_even_smaller.png) Team Dörnbach
 
 *Nobody can develop a self-driving car alone and so it was really a huge pleasure to spend theses last 10 months together in Slack with this awesome team and to develop this final of the overall 14 projects with it:*
 
@@ -36,13 +36,13 @@ The operating system used for this task is called ROS (Robot Operating System), 
 
 
 
-*"Self-Driving Car Engineer? Dat war doch schon immer dein alter Jugendtraum!"*
+*"Self-Driving Car Engineer Nanodegree? Dat war doch schon immer dein alter Jugendtraum!"*
 
 ---
 
-![](C:\Projects\CarND-Capstone\imgs\starts_driving.gif)
+![](imgs/starts_driving.gif)
 
-![](C:\Projects\CarND-Capstone\imgs\ros_in_action.gif)
+![](imgs/ros_in_action.gif)
 
 ---
 
