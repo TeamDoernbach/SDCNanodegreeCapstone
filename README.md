@@ -28,11 +28,11 @@ The operating system used for this task is called ROS (Robot Operating System), 
 
 
 
-* Michael Berner - Mercedes Benz Trucks
-* Michael Ikemann - Lead Engineer @ Zühlke Engineering GmbH
-* Jakub Prüher - PhD candidate in cybernetics
-* Soen Surya Soenaryo - Software Engineer @ Xendit
-* Melih Yazgan - Engineer @ ITK Engineering GmbH
+* [Michael Berner](https://github.com/thelukasssheee) - Mercedes Benz Trucks
+* [Michael Ikemann](https://github.com/alyxion) - Lead Engineer @ Zühlke Engineering GmbH
+* [Jakub Prüher](https://github.com/jacobnzw) - PhD candidate in cybernetics
+* [Soen Surya Soenaryo](https://github.com/weisurya) - Software Engineer @ Xendit
+* [Melih Yazgan](https://github.com/melihyazgan) - Engineer @ ITK Engineering GmbH
 
 
 
